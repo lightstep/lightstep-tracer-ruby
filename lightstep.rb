@@ -48,7 +48,7 @@ module LightStep
 	# @param $access_token The project access token
 	# @return LightStepBase_Tracer
 	# @throws Exception if the group name or access token is not a valid string.
-  	def self.new_tracer(component_name, access_token, opts = nil)
+  	def self.init_new_tracer(component_name, access_token, opts = nil)
   		if (opts.nil?)
       		opts = {}
     	end

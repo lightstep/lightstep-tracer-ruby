@@ -1,6 +1,6 @@
 require 'json'
 require 'zlib'
-require 'socket'
+require 'net/https'
 
 class TransportHTTPJSON
 
@@ -35,15 +35,15 @@ class TransportHTTPJSON
             puts report.inspect
         end
 
-        content += report.to_json
+        content = report.to_json
         # content = gzencode(content)
-        content = Zlib::deflate(content)
+        # content = Zlib::deflate(content)
 
         header = "Host: " + @host + "\r\n"
         header += "User-Agent: LightStep-Ruby\r\n"
         header += "LightStep-Access-Token: " + auth.access_token + "\r\n"
         header += "Content-Type: application/json\r\n"
-        header += "Content-Length: " + content.length + "\r\n"
+        header += "Content-Length: " + content.length.to_s + "\r\n"
         header += "Content-Encoding: gzip\r\n"
         header += "Connection: keep-alive\r\n\r\n"
 

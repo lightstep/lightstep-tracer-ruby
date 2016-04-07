@@ -210,7 +210,10 @@ class ClientTracer < Tracer
     # Convert the counters to thrift form
     thrift_counters = []
     @tracer_counters.each do |key, value|
-      thrift_counters.push(NamedCounter.new(key.to_s => value.to_i))
+      thrift_counters.push(NamedCounter.new(
+        :Name => key.to_s,
+        :Value => value.to_i,
+      ))
     end
     report_request = ReportRequest.new({:runtime => @tracer_thrift_runtime, :oldest_micros => @tracer_report_start_time.to_i, :youngest_micros => now.to_i, :log_records => @tracer_log_records, :span_records => @tracer_span_records, :counters => thrift_counters})
 

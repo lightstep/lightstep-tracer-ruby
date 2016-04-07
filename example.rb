@@ -1,7 +1,14 @@
 require './lightstep.rb'
 
-LightStep.initGlobalTracer('lightstep/ruby/example', '{your_access_token}')
+LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}', {
+    :collector_host => 'localhost',
+    :collector_port => 9998,
+    :collector_encryption => 'none',
+})
 
-span = LightStep.instance.startSpan('my_span')
-span.logEvent('hello world', { 'count' => 42 })
+span = LightStep.start_span('my_span')
+span.log_event('hello world', { 'count' => 42 })
 span.finish()
+
+LightStep.instance.flush()
+puts 'Done!'

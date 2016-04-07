@@ -16,7 +16,7 @@ class ClientSpan
         @join_ids = {}
 
         @tracer = tracer
-        @guid = tracer.generateUUIDString
+        @guid = tracer.generate_uuid_string
     end
 
     def finalize
@@ -85,7 +85,7 @@ class ClientSpan
         self
     end
 
-    def logEvent(event, payload = nil)
+    def log_event(event, payload = nil)
         self.log( { 'event' => event.to_s, 'payload' => payload } )
     end
 
@@ -106,20 +106,24 @@ class ClientSpan
     def toThrift
         # Coerce all the types to strings to ensure there are no encoding/decoding
         # issues
-        local_join_ids = []
-
+        join_ids = []
         @join_ids.each do |key, value|
-            pair = TraceJoinId.new({:trace_key => key.to_s, :value => value.to_s})
-            local_join_ids.push(pair)
+            join_ids << TraceJoinId.new({:TraceKey => key.to_s, :Value => value.to_s})
+        end
+
+        attributes = Array.new
+        @tags.each do |key, value|
+            attributes << KeyValue.new({ :Key => key.to_s, :Value => value.to_s })
         end
 
         rec = SpanRecord.new({
             :runtime_guid => @tracer.guid().to_s,
             :span_guid => @guid.to_s,
             :span_name => @operation.to_s,
-            :oldest_micros => @startMicros.to_i,
-            :youngest_micros => @endMicros.to_i,
-            :join_ids => local_join_ids,
+            :attributes => attributes,
+            :oldest_micros => @start_micros.to_i,
+            :youngest_micros => @end_micros.to_i,
+            :join_ids => join_ids,
             :error_flag => @errorFlag
         })
     end

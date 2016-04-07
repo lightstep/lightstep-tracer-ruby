@@ -5,11 +5,10 @@ require_relative '../api'
 require_relative './client_span'
 require_relative './no_op_span'
 require_relative './util'
-require_relative './transports/transport_udp'
 require_relative './transports/transport_http_json'
 require_relative '../thrift/types'
 
-LIGHTSTEP_VERSION = '0.0.0'
+LIGHTSTEP_VERSION = '0.1.0'
 
 # ============================================================
  # Main implementation of the Tracer interface
@@ -18,12 +17,14 @@ LIGHTSTEP_VERSION = '0.0.0'
 class ClientTracer < Tracer
 
   def initialize(options = {})
-    # Variables Initialize
+
+    @tracer_utils = Util.new
     @tracer_options = {}
     @tracer_enabled = true
     @tracer_debug = false
     @tracer_guid = ""
-    @tracer_start_time = 0
+    @tracer_start_time = @tracer_utils.now_micros
+    puts @tracer_utils.now_micros
     @tracer_thrift_auth = nil
     @tracer_thrift_runtime = nil
     @tracer_transport = nil
@@ -35,8 +36,6 @@ class ClientTracer < Tracer
     @tracer_min_flush_period_micros = 0
     @tracer_max_flush_period_micros = 0
 
-    @tracer_utils = Util.new
-
     @tracer_defaults = {
         :collector_host => 'collector.lightstep.com',
         :collector_port => 80,
@@ -47,9 +46,6 @@ class ClientTracer < Tracer
         :min_reporting_period_secs => 0.1,
         :max_reporting_period_secs => 5.0,
 
-        # PHP-specific configuration
-        # TODO: right now any payload with depth greater than this is simply
-        # rejected; it is not trimmed.
         :max_payload_depth => 10,
 
         # Internal debugging flag that enables additional logging and
@@ -83,7 +79,7 @@ class ClientTracer < Tracer
 
     # Note: the GUID is not generated until the library is initialized
     # as it depends on the access token
-    @tracer_start_time = @tracer_utils.nowMicros
+    @tracer_start_time = @tracer_utils.now_micros
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros =@tracer_start_time
 
@@ -138,23 +134,23 @@ class ClientTracer < Tracer
   end
 
   # ===========================================================
-   # Internal use only.
-
-   # Discard all currently buffered data.  Useful for unit testing.
+  # Internal use only.
+  # Discard all currently buffered data.  Useful for unit testing.
   # ===========================================================
   def discard
     @tracer_log_records = {}
     @tracer_span_records = {}
   end
 
-  def startSpan(operation_name, fields = nil)
+  def start_span(operation_name, fields = nil)
     unless (@tracer_enabled)
       return NoOpSpan.new
     end
 
     span = ClientSpan.new(self)
     span.setOperationName(operation_name)
-    span.setStartMicros(@tracer_utils.nowMicros)
+    span.setStartMicros(@tracer_utils.now_micros)
+    span.setTag('join:trace_id', self.generate_uuid_string)
 
     unless (fields.nil?)
       unless (fields[:parent].nil?)
@@ -175,7 +171,7 @@ class ClientTracer < Tracer
       return
     end
 
-    now = @tracer_utils.nowMicros
+    now = @tracer_utils.now_micros
 
     # The thrift configuration has not yet been set: allow logs and spans
     # to be buffered in this case, but flushes won't yet be possible.
@@ -253,8 +249,8 @@ class ClientTracer < Tracer
     # Internal use only.
     #
     # Generates a random ID (not a *true* UUID).
-    def generateUUIDString
-        return SecureRandom.uuid
+    def generate_uuid_string
+        return SecureRandom.hex(8)
     end
 
     # Internal use only.
@@ -262,7 +258,7 @@ class ClientTracer < Tracer
         unless (@tracer_enabled)
             return
         end
-        span.setEndMicros(@tracer_utils.nowMicros)
+        span.setEndMicros(@tracer_utils.now_micros)
         full = self.pushWithMax(@tracer_span_records, span.toThrift, @tracer_options[:max_span_records])
         if full
             @tracer_counters[:dropped_spans] += 1
@@ -296,7 +292,7 @@ class ClientTracer < Tracer
         fields[:runtime_guid] = @tracer_guid.to_s
 
         if (fields[:timestamp_micros].nil?)
-            fields[:timestamp_micros] = @tracer_utils.nowMicros.to_i
+            fields[:timestamp_micros] = @tracer_utils.now_micros.to_i
         end
 
         # TODO: data scrubbing and size limiting
@@ -309,7 +305,7 @@ class ClientTracer < Tracer
 
         rec = LogRecord.new(fields)
         full = self.pushWithMax(@tracer_log_records, rec, @tracer_options[:max_log_records])
-        unless (full.nil?)
+        if full
             @tracer_counters[:dropped_logs] += 1
         end
     end
@@ -349,7 +345,7 @@ class ClientTracer < Tracer
         return
       end
 
-      now = @tracer_utils.nowMicros();
+      now = @tracer_utils.now_micros
       delta = now - @tracer_last_flush_micros
 
       # Set a bound on maximum flush frequency
@@ -417,7 +413,7 @@ class ClientTracer < Tracer
 
       # Generate the GUID on thrift initialization as the GUID should be
       # stable for a particular access token / component name combo.
-      @tracer_guid = self.generateUUIDString()
+      @tracer_guid = self.generate_uuid_string()
       @tracer_thrift_auth = Auth.new({:access_token => access_token.to_s})
 
       thrift_attrs = []

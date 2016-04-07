@@ -14,22 +14,22 @@ module LightStep
 	# @return LightStepBase_Tracer
 	# @throws Exception if the component name or access token is not a valid string
 	# @throws Exception if the tracer singleton has already been initialized
-	def self.initGlobalTracer(component_name, access_token, opts = nil)
-		if (component_name.class.name != "String" || component_name.size == 0)
+	def self.init_global_tracer(component_name, access_token, opts = nil)
+		if component_name.class.name != "String" || component_name.size == 0
         	puts "Invalid component_name: #{component_name}"
         	exit(1)
     	end
 
-    	if (access_token.class.name != "String" || access_token.size == 0)
+    	if access_token.class.name != "String" || access_token.size == 0
     		puts "Invalid access_token"
     		exit(1)
     	end
 
-    	if(@@instance.nil?)
-			if (opts.nil?)
+    	if @@instance.nil?
+			if opts.nil?
 				opts = {}
 			end
-    		@@instance = self.newTracer(component_name, access_token, opts)
+    		@@instance = self.new_tracer(component_name, access_token, opts)
     	else
 			puts "initGlobalTracer called multiple times"
 			exit(1)
@@ -48,7 +48,7 @@ module LightStep
 	# @param $access_token The project access token
 	# @return LightStepBase_Tracer
 	# @throws Exception if the group name or access token is not a valid string.
-  	def self.newTracer(component_name, access_token, opts = nil)
+  	def self.new_tracer(component_name, access_token, opts = nil)
   		if (opts.nil?)
       		opts = {}
     	end
@@ -61,11 +61,11 @@ module LightStep
     	ClientTracer.new(opts)
   	end
 
-	def self.startSpan(operation_name, fields = nil)
-		self.instance.startSpan(operation_name, fields)
+	def self.start_span(operation_name, fields = nil)
+		self.instance.start_span(operation_name, fields)
 	end
 
   	def self.flush
-		self.getInstance.flush
+		self.instance.flush
   	end
 end

@@ -1,6 +1,7 @@
 require 'json'
 require 'zlib'
-require 'net/https'
+require 'net/http'
+require 'thrift'
 
 class TransportHTTPJSON
 
@@ -8,17 +9,18 @@ class TransportHTTPJSON
         @host = ''
         @port = 0
         @verbose = 0
+        @secure = true
     end
 
     def ensureConnection(options)
         @verbose = options[:verbose]
-
         @host = options[:collector_host]
         @port = options[:collector_port]
+        @secure = true
 
         # The prefixed protocol is only needed for secure connections
-        if (options[:collector_secure])
-            @host = 'ssl://' + @host
+        if options[:collector_encryption] == 'none'
+            @secure = false
         end
     end
 
@@ -35,34 +37,45 @@ class TransportHTTPJSON
             puts report.inspect
         end
 
-        content = report.to_json
-        # content = gzencode(content)
+        content = self._thrift_struct_to_object(report)
         # content = Zlib::deflate(content)
 
-        header = "Host: " + @host + "\r\n"
-        header += "User-Agent: LightStep-Ruby\r\n"
-        header += "LightStep-Access-Token: " + auth.access_token + "\r\n"
-        header += "Content-Type: application/json\r\n"
-        header += "Content-Length: " + content.length.to_s + "\r\n"
-        header += "Content-Encoding: gzip\r\n"
-        header += "Connection: keep-alive\r\n\r\n"
-
-        # TODO: This is PHP code, not Ruby code!!!!
-        #
-        # fp = @pfsockopen(@host, @port, errno, errstr);
-        # unless (fp)
-        #     if (@verbose > 0)
-        #         # error_log(errstr)
-        #         puts errstr.to_s
-        #         exit(1)
-        #     end
-        #     return nil
-        # end
-        # @fwrite(fp, "POST /api/v0/reports HTTP/1.1\r\n")
-        # @fwrite(fp, header + content)
-        # @fflush(fp)
-        # @fclose(fp)
-
+        https = Net::HTTP.new(@host, @port)
+        https.use_ssl = @secure
+        req = Net::HTTP::Post.new('/api/v0/reports')
+        req['LightStep-Access-Token'] = auth.access_token
+        req['Content-Type'] = 'application/json'
+        req['Connection'] = 'keep-alive'
+        req.body = content.to_json
+        res = https.request(req)
         return nil
+    end
+
+    def _thrift_array_to_object(value)
+        arr = Array.new
+        value.each do |elem|
+            arr << self._thrift_struct_to_object(elem)
+        end
+        arr
+    end
+
+    def _thrift_struct_to_object(report)
+        obj = Hash.new
+        report.each_field do |fid, field_info|
+            type = field_info[:type]
+            name = field_info[:name]
+            value = report.instance_variable_get("@#{name}")
+
+            if value == nil
+                # Skip
+            elsif type == Thrift::Types::LIST
+                obj[name] = self._thrift_array_to_object(value)
+            elsif type == Thrift::Types::STRUCT
+                obj[name] = self._thrift_struct_to_object(value)
+            else
+                obj[name] = value
+            end
+        end
+        obj
     end
 end

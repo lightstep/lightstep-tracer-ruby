@@ -1,3 +1,3 @@
 # WORK IN PROGRESS
 
-This is not yet working code!!!
+This library is still a work in progress.

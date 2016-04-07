@@ -34,45 +34,40 @@ class ClientSpan
         @guid
     end
 
-    def setStartMicros(start)
+    def set_start_micros(start)
         @start_micros = start
        self
     end
 
-    def setEndMicros(start)
+    def set_end_micros(start)
         @end_micros = start
         self
     end
 
     def finish
-        @tracer.finishSpan(self)
+        @tracer._finish_span(self)
     end
 
-    def setOperationName(name)
+    def set_operation_name(name)
         @operation = name
         self
     end
 
-    def addTraceJoinId(key, value)
-        @join_ids[key] = value
-        self
-    end
-
-    def setTag(key, value)
+    def set_tag(key, value)
         @tags[key] = value
         self
     end
 
-    def setBaggageItem(key, value)
+    def set_baggage_item(key, value)
         @baggage[key] = value
         self
     end
 
-    def getBaggageItem(key)
+    def get_baggage_item(key)
         @baggage[key]
     end
 
-    def setParent(span)
+    def set_parent(span)
         # Inherit any join IDs from the parent that have not been explicitly
         # set on the child
         span.join_ids.each do |key, value|
@@ -81,7 +76,8 @@ class ClientSpan
             end
         end
 
-        self.setTag(:parent_span_guid, span.guid)
+        self.set_tag(:parent_span_guid, span.guid)
+        self.set_tag('join:trace_id', span.tags['join:trace_id'])
         self
     end
 
@@ -100,10 +96,10 @@ class ClientSpan
         unless(fields[:timestamp].nil?)
             record[:timestamp_micros] = (fields[:timestamp] * 1000).to_i
         end
-        @tracer.rawLogRecord(record, fields[:payload])
+        @tracer.raw_log_record(record, fields[:payload])
     end
 
-    def toThrift
+    def to_thrift
         # Coerce all the types to strings to ensure there are no encoding/decoding
         # issues
         join_ids = []
@@ -127,15 +123,4 @@ class ClientSpan
             :error_flag => @errorFlag
         })
     end
-
-    protected
-        def secondLog(level, error_flag, fmt, *all_args)
-            # The $allArgs variable contains the fmt string
-            # allArgs.shift
-            # $text = vsprintf($fmt, $allArgs);
-            text = all_args.join(',')
-
-            @tracer.rawLogRecord({:span_guid => @guid.to_s, :level => level, :error_flag => error_flag, :message => text}, all_args)
-            return text
-        end
 end

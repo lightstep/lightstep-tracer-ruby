@@ -4,7 +4,6 @@ require 'net/http'
 require 'thrift'
 
 class TransportHTTPJSON
-
     def initialize
         @host = ''
         @port = 0
@@ -12,7 +11,7 @@ class TransportHTTPJSON
         @secure = true
     end
 
-    def ensureConnection(options)
+    def ensure_connection(options)
         @verbose = options[:verbose]
         @host = options[:collector_host]
         @port = options[:collector_port]
@@ -24,15 +23,13 @@ class TransportHTTPJSON
         end
     end
 
-    def flushReport(auth, report)
+    def flush_report(auth, report)
         if (auth.nil? || report.nil?)
             if (@verbose > 0)
                 puts 'Auth or report not set.'
-                exit(1)
             end
             return nil
         end
-
         if (@verbose >= 3)
             puts report.inspect
         end
@@ -51,6 +48,9 @@ class TransportHTTPJSON
         return nil
     end
 
+    # In many other languages the built-in "toJSON" methods and functions
+    # generally do what is desired. In Ruby, the Thrift types need to be
+    # converted to plain arrays and hashes before calling to_json.
     def _thrift_array_to_object(value)
         arr = Array.new
         value.each do |elem|

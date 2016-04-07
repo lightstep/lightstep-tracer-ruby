@@ -1,7 +1,6 @@
 require 'securerandom'
 require 'json'
 
-require_relative '../api'
 require_relative './client_span'
 require_relative './no_op_span'
 require_relative './util'
@@ -14,7 +13,7 @@ LIGHTSTEP_VERSION = '0.1.0'
  # Main implementation of the Tracer interface
 # =============================================================
 
-class ClientTracer < Tracer
+class ClientTracer
 
   def initialize(options = {})
 
@@ -24,7 +23,6 @@ class ClientTracer < Tracer
     @tracer_debug = false
     @tracer_guid = ""
     @tracer_start_time = @tracer_utils.now_micros
-    puts @tracer_utils.now_micros
     @tracer_thrift_auth = nil
     @tracer_thrift_runtime = nil
     @tracer_transport = nil
@@ -38,8 +36,8 @@ class ClientTracer < Tracer
 
     @tracer_defaults = {
         :collector_host => 'collector.lightstep.com',
-        :collector_port => 80,
-        :collector_secure => false,
+        :collector_port => 443,
+        :collector_encryption => 'tls',
         :transport => 'http_json',
         :max_log_records => 1000,
         :max_span_records => 1000,
@@ -69,7 +67,7 @@ class ClientTracer < Tracer
     end
 
     # Set the options, merged with the defaults
-    self.setOption(@tracer_defaults.merge(options))
+    self.set_option(@tracer_defaults.merge(options))
 
     if (@tracer_options[:transport] == 'udp')
       @tracer_transport = TransportUDP.new
@@ -94,14 +92,14 @@ class ClientTracer < Tracer
     self.flush
   end
 
-  def setOption(options)
+  def set_option(options)
 
     @tracer_options.merge!(options)
 
     # Deferred group name / access token initialization is supported (i.e.
     # it is possible to create logs/spans before setting this info).
     if (!options[:access_token].nil? && !options[:component_name].nil?)
-      self.initThriftDataIfNeeded(options[:component_name], options[:access_token])
+      self.init_thrift_data_if_needed(options[:component_name], options[:access_token])
     end
 
     unless (options[:min_reporting_period_secs].nil?)
@@ -116,11 +114,11 @@ class ClientTracer < Tracer
     # Coerce invalid options into stable values
     unless (@tracer_options[:max_log_records] > 0)
       @tracer_options[:max_log_records] = 1
-      self.debugRecordError('Invalid value for max_log_records')
+      self.debug_record_error('Invalid value for max_log_records')
     end
     unless (@tracer_options[:max_span_records] > 0)
       @tracer_options[:max_span_records] = 1
-      self.debugRecordError('Invalid value for max_span_records')
+      self.debug_record_error('Invalid value for max_span_records')
     end
   end
 
@@ -148,19 +146,19 @@ class ClientTracer < Tracer
     end
 
     span = ClientSpan.new(self)
-    span.setOperationName(operation_name)
-    span.setStartMicros(@tracer_utils.now_micros)
-    span.setTag('join:trace_id', self.generate_uuid_string)
+    span.set_operation_name(operation_name)
+    span.set_start_micros(@tracer_utils.now_micros)
+    span.set_tag('join:trace_id', self.generate_uuid_string)
 
     unless (fields.nil?)
       unless (fields[:parent].nil?)
-        span.setParent(fields[:parent])
+        span.set_parent(fields[:parent])
       end
       unless (fields[:tags].nil?)
-        span.setTags(fields[:tags])
+        span.set_tags(fields[:tags])
       end
       unless (fields[:startTime].nil?)
-        span.setStartMicros(fields[:startTime] * 1000)
+        span.set_start_micros(fields[:startTime] * 1000)
       end
     end
     return span
@@ -175,7 +173,7 @@ class ClientTracer < Tracer
 
     # The thrift configuration has not yet been set: allow logs and spans
     # to be buffered in this case, but flushes won't yet be possible.
-    if (@tracer_thrift_runtime.nil?)
+    if @tracer_thrift_runtime.nil?
       return
     end
 
@@ -188,7 +186,7 @@ class ClientTracer < Tracer
       return
     end
 
-    @tracer_transport.ensureConnection(@tracer_options)
+    @tracer_transport.ensure_connection(@tracer_options)
 
     # Ensure the log / span GUIDs are set correctly. This is covers a real
     # case: the runtime GUID cannot be generated until the access token
@@ -219,12 +217,12 @@ class ClientTracer < Tracer
     # try {
     #   # It *is* valid for the transport to return a null response in the
     #   # case of a low-overhead "fire and forget" report
-    resp = @tracer_transport.flushReport(@tracer_thrift_auth, report_request)
+    resp = @tracer_transport.flush_report(@tracer_thrift_auth, report_request)
     # } catch (\Exception $e) {
     #   # Exceptions *are* expected as connections can be broken, etc. when
     #   # reporting. Prevent reporting exceptions from interfering with the
     #   # client code.
-    #   $this->debugRecordError($e);
+    #   $this->debug_record_error($e);
     # end
 
     # ALWAYS reset the buffers and update the counters as the RPC response
@@ -254,16 +252,16 @@ class ClientTracer < Tracer
     end
 
     # Internal use only.
-    def finishSpan(span)
+    def _finish_span(span)
         unless (@tracer_enabled)
             return
         end
-        span.setEndMicros(@tracer_utils.now_micros)
-        full = self.pushWithMax(@tracer_span_records, span.toThrift, @tracer_options[:max_span_records])
+        span.set_end_micros(@tracer_utils.now_micros)
+        full = self.push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
         if full
             @tracer_counters[:dropped_spans] += 1
         end
-        self.flushIfNeeded
+        self.flush_if_needed
     end
 
   # =============================================================
@@ -275,16 +273,16 @@ class ClientTracer < Tracer
     # text = vsprintf(fmt, allArgs)
     text = args.join(',')
 
-    self.rawLogRecord({:level => level, :message => text}, args)
+    self.raw_log_record({:level => level, :message => text}, args)
 
-    self.flushIfNeeded
+    self.flush_if_needed
     return text
   end
 
     # ==============================================================
     # Internal use only.
     # ==============================================================
-    def rawLogRecord(fields, payload_array)
+    def raw_log_record(fields, payload_array)
         unless (@tracer_enabled)
           return
         end
@@ -304,7 +302,7 @@ class ClientTracer < Tracer
         end
 
         rec = LogRecord.new(fields)
-        full = self.pushWithMax(@tracer_log_records, rec, @tracer_options[:max_log_records])
+        full = self.push_with_max(@tracer_log_records, rec, @tracer_options[:max_log_records])
         if full
             @tracer_counters[:dropped_logs] += 1
         end
@@ -312,7 +310,7 @@ class ClientTracer < Tracer
 
   protected
 
-    def pushWithMax(arr, item, max)
+    def push_with_max(arr, item, max)
       unless (max > 0)
         max = 1
       end
@@ -330,7 +328,7 @@ class ClientTracer < Tracer
       end
     end
 
-    def debugRecordError(e)
+    def debug_record_error(e)
       if (@tracer_debug)
         # error_log(e)
         puts e.to_s
@@ -340,7 +338,7 @@ class ClientTracer < Tracer
 
     # PHP does not have an event loop or timer threads. Instead manually check as
     # new data comes in by calling this method.
-    def flushIfNeeded
+    def flush_if_needed
       unless (@tracer_enabled)
         return
       end
@@ -370,7 +368,7 @@ class ClientTracer < Tracer
       end
     end
 
-    def initThriftDataIfNeeded(component_name, access_token)
+    def init_thrift_data_if_needed(component_name, access_token)
 
       # Pre-conditions
       if (access_token.class.name != 'String')

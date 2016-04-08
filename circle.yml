@@ -4,4 +4,4 @@ machine:
 
 dependencies:
   pre:
-    - gem install bundler
+    - gem install bundler ~1.11

@@ -1,0 +1,25 @@
+# coding: utf-8
+lib = File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require 'lightstep/tracer/version'
+
+Gem::Specification.new do |spec|
+  spec.name          = "lightstep-tracer"
+  spec.version       = Lightstep::Tracer::VERSION
+  spec.authors       = ["bcronin"]
+  spec.email         = ["bcronin@lightstep.com"]
+
+  spec.summary       = %q{LightStep OpenTracing Ruby bindings}
+  spec.homepage      = "https://github.com/lightstep/lightstep-tracer-ruby"
+  spec.license       = "MIT"
+
+  spec.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
+  spec.bindir        = "exe"
+  spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
+  spec.require_paths = ["lib"]
+
+  spec.add_dependency 'thrift', '0.9.2.0'
+  spec.add_development_dependency "bundler", "~> 1.11"
+  spec.add_development_dependency "rake", "~> 10.0"
+  spec.add_development_dependency "rspec", "~> 3.0"
+end

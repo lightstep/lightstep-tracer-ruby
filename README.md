@@ -1,4 +1,4 @@
-# IN DEVELOPMENT
+# WORK IN PROGRESS
 
 **NOTE: this library is still under active development and is not yet fully stable. Pull requests are most welcome!**
 

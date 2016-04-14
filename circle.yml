@@ -1,3 +1,7 @@
+general:
+  branches:
+    only:
+      - master
 machine:
   ruby:
     version: 2.2.3

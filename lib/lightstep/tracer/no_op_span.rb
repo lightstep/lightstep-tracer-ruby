@@ -1,5 +1,5 @@
 require_relative './util'
-require_relative '../thrift/types'
+require_relative './thrift/types'
 
 class NoOpSpan
     def guid; ''; end

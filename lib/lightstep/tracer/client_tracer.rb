@@ -6,8 +6,8 @@ require_relative './no_op_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
 require_relative './thrift/types'
+require_relative './version.rb'
 
-LIGHTSTEP_VERSION = '0.1.0'
 
 # ============================================================
  # Main implementation of the Tracer interface
@@ -405,7 +405,7 @@ class ClientTracer
       # Tracer attributes
       runtime_attrs = {
           :lightstep_tracer_platform => 'ruby',
-          :lightstep_tracer_version => LIGHTSTEP_VERSION,
+          :lightstep_tracer_version => Lightstep::Tracer::VERSION,
           :ruby_version => RUBY_VERSION
       }
 

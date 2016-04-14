@@ -1,6 +1,6 @@
 require 'thrift'
-require './thrift/types'
-require './client/client_tracer'
+require './lib/lightstep/tracer/thrift/types'
+require './lib/lightstep/tracer/client_tracer'
 
 module LightStep
 
@@ -29,7 +29,7 @@ module LightStep
 			if opts.nil?
 				opts = {}
 			end
-    		@@instance = self.new_tracer(component_name, access_token, opts)
+    		@@instance = self.init_new_tracer(component_name, access_token, opts)
     	else
 			puts "initGlobalTracer called multiple times"
 			exit(1)

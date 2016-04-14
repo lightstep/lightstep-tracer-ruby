@@ -5,7 +5,7 @@ require_relative './client_span'
 require_relative './no_op_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
-require_relative '../thrift/types'
+require_relative './thrift/types'
 
 LIGHTSTEP_VERSION = '0.1.0'
 

@@ -1,9 +1,12 @@
-/.bundle/
-/.yardoc
-/Gemfile.lock
-/_yardoc/
-/coverage/
+.bundle/
+.yardoc
+Gemfile.lock
+_yardoc/
+coverage/
 /doc/
 /pkg/
 /spec/reports/
 /tmp/
+*~
+Gemfile.lock
+lightstep-tracer*.gem

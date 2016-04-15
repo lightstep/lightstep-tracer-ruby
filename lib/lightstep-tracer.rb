@@ -1,5 +1,5 @@
-require './lib/lightstep/tracer/thrift/types'
-require './lib/lightstep/tracer/client_tracer'
+require_relative './lightstep/tracer/thrift/types'
+require_relative './lightstep/tracer/client_tracer'
 
 module LightStep
 

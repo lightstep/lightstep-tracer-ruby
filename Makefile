@@ -8,7 +8,7 @@ test:
 	ruby example.rb
 
 publish: build test
-	gem bump --version patch
+	ruby -e 'require "bump"; Bump::Bump.run("patch")'
 	make build	# rebuild after version increment
 	git tag `ruby scripts/version.rb`
 	git push

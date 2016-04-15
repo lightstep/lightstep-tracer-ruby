@@ -1,4 +1,3 @@
-require 'thrift'
 require './lib/lightstep/tracer/thrift/types'
 require './lib/lightstep/tracer/client_tracer'
 

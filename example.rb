@@ -1,4 +1,4 @@
-require './lightstep.rb'
+require_relative './lib/lightstep.rb'
 
 LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}', {
     #:collector_host => 'localhost',

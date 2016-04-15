@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.name          = "lightstep-tracer"
   spec.version       = Lightstep::Tracer::VERSION
   spec.authors       = ["bcronin"]
-  spec.email         = ["bcronin@lightstep.com"]
+  spec.email         = ["support@lightstep.com"]
 
   spec.summary       = %q{LightStep OpenTracing Ruby bindings}
   spec.homepage      = "https://github.com/lightstep/lightstep-tracer-ruby"

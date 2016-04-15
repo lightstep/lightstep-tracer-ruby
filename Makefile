@@ -5,6 +5,7 @@ build:
 
 test:
 	rake spec
+	ruby example.rb
 
 publish: build test
 	gem bump --version patch

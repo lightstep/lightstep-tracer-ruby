@@ -1,4 +1,4 @@
-require_relative '../lightstep.rb'
+require_relative '../lib/lightstep.rb'
 
 describe LightStep do
     it "should return a new tracer from init_new_tracer" do

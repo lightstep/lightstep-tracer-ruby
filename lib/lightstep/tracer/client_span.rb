@@ -21,7 +21,7 @@ class ClientSpan
 
     def finalize
         if @end_micros == 0
-            self.warnf("finish() never closed on span (operaton='%s')", @operation, @join_ids)
+            # TODO: Notify about that finish() was never called for this span
             self.finish
         end
     end
@@ -86,13 +86,11 @@ class ClientSpan
     end
 
     def log(fields)
-          record = {:span_guid => @guid.to_s}
-        payload = nil
+        record = {:span_guid => @guid.to_s}
 
         unless(fields[:event].nil?)
             record[:stable_name] = fields[:event].to_s
         end
-
         unless(fields[:timestamp].nil?)
             record[:timestamp_micros] = (fields[:timestamp] * 1000).to_i
         end
@@ -120,7 +118,7 @@ class ClientSpan
             :oldest_micros => @start_micros.to_i,
             :youngest_micros => @end_micros.to_i,
             :join_ids => join_ids,
-            :error_flag => @errorFlag
+            :error_flag => @error_flag
         })
     end
 end

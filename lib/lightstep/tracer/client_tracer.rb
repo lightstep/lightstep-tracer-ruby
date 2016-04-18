@@ -48,10 +48,7 @@ class ClientTracer
       # Internal debugging flag that enables additional logging and
       # tracer checks. Not intended to run in production as it may add
       # logging "noise" to the calling code.
-      verbose: 0,
-
-      # Flag intended solely to unit testing convenience
-      debug_disable_flush: false
+      verbose: 0
     }
 
     # Modify some of the interdependent defaults based on what the user-specified
@@ -163,9 +160,6 @@ class ClientTracer
     return if @tracer_thrift_runtime.nil?
 
     return if @tracer_log_records.empty? && @tracer_span_records.empty?
-
-    # For unit testing
-    return if @tracer_options[:debug_disable_flush]
 
     @tracer_transport.ensure_connection(@tracer_options)
 

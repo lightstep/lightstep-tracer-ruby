@@ -1,86 +1,83 @@
-require 'securerandom'
 require 'json'
 
 require_relative './client_span'
-require_relative './no_op_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
 require_relative './thrift/types'
 require_relative './version.rb'
 
-
 # ============================================================
- # Main implementation of the Tracer interface
+# Main implementation of the Tracer interface
 # =============================================================
 
 class ClientTracer
-
   def initialize(options = {})
-
     @tracer_utils = Util.new
     @tracer_options = {}
     @tracer_enabled = true
     @tracer_debug = false
-    @tracer_guid = ""
+    @tracer_guid = ''
     @tracer_start_time = @tracer_utils.now_micros
     @tracer_thrift_auth = nil
     @tracer_thrift_runtime = nil
     @tracer_transport = nil
     @tracer_report_start_time = 0
-    @tracer_log_records = Array.new
-    @tracer_span_records = Array.new
-    @tracer_counters = {:dropped_logs => 0, :dropped_counters => 0}
+    @tracer_log_records = []
+    @tracer_span_records = []
+    @tracer_counters = {
+      dropped_logs: 0,
+      dropped_spans: 0
+    }
     @tracer_last_flush_micros = 0
-    @tracer_min_flush_period_micros = 0
-    @tracer_max_flush_period_micros = 0
+    @tracer_min_flush_period_micros = 500 * 1000
+    @tracer_max_flush_period_micros = 30_000 * 1000
 
     @tracer_defaults = {
-        :collector_host => 'collector.lightstep.com',
-        :collector_port => 443,
-        :collector_encryption => 'tls',
-        :transport => 'http_json',
-        :max_log_records => 1000,
-        :max_span_records => 1000,
-        :min_reporting_period_secs => 0.1,
-        :max_reporting_period_secs => 5.0,
+      collector_host: 'collector.lightstep.com',
+      collector_port: 443,
+      collector_encryption: 'tls',
+      transport: 'http_json',
+      max_log_records: 1000,
+      max_span_records: 1000,
+      min_reporting_period_secs: 0.1,
+      max_reporting_period_secs: 5.0,
 
-        :max_payload_depth => 10,
+      max_payload_depth: 10,
 
-        # Internal debugging flag that enables additional logging and
-        # tracer checks. Not intended to run in production as it may add
-        # logging "noise" to the calling code.
-        :verbose => 0,
+      # Internal debugging flag that enables additional logging and
+      # tracer checks. Not intended to run in production as it may add
+      # logging "noise" to the calling code.
+      verbose: 0,
 
-        # Flag intended solely to unit testing convenience
-        :debug_disable_flush => false
+      # Flag intended solely to unit testing convenience
+      debug_disable_flush: false
     }
 
     # Modify some of the interdependent defaults based on what the user-specified
-    unless (options[:collector_secure].nil?)
+    unless options[:collector_secure].nil?
       @tracer_defaults[:collector_port] = options[:collector_secure] ? 443 : 80
     end
 
     # UDP has significantly lower size contraints
-    if (!options[:transport].nil? && options[:transport] == 'udp')
+    if !options[:transport].nil? && options[:transport] == 'udp'
       @tracer_defaults[:max_log_records] = 16
       @tracer_defaults[:max_span_records] = 16
     end
 
     # Set the options, merged with the defaults
-    self.set_option(@tracer_defaults.merge(options))
+    set_option(@tracer_defaults.merge(options))
 
-    if (@tracer_options[:transport] == 'udp')
-      @tracer_transport = TransportUDP.new
-    else
-      @tracer_transport = TransportHTTPJSON.new
-    end
+    @tracer_transport = if @tracer_options[:transport] == 'udp'
+                          TransportUDP.new
+                        else
+                          TransportHTTPJSON.new
+                        end
 
     # Note: the GUID is not generated until the library is initialized
     # as it depends on the access token
     @tracer_start_time = @tracer_utils.now_micros
     @tracer_report_start_time = @tracer_start_time
-    @tracer_last_flush_micros =@tracer_start_time
-
+    @tracer_last_flush_micros = @tracer_start_time
   end
 
   # def self.finalize(bar)
@@ -89,45 +86,44 @@ class ClientTracer
   # end
 
   def finalize
-    self.flush
+    flush
   end
 
   def set_option(options)
-
     @tracer_options.merge!(options)
 
     # Deferred group name / access token initialization is supported (i.e.
     # it is possible to create logs/spans before setting this info).
-    if (!options[:access_token].nil? && !options[:component_name].nil?)
-      self.init_thrift_data_if_needed(options[:component_name], options[:access_token])
+    if !options[:access_token].nil? && !options[:component_name].nil?
+      init_thrift_data_if_needed(options[:component_name], options[:access_token])
     end
 
-    unless (options[:min_reporting_period_secs].nil?)
+    unless options[:min_reporting_period_secs].nil?
       @tracer_min_flush_period_micros = options[:min_reporting_period_secs] * 1E6
     end
-    unless (options[:max_reporting_period_secs])
+    unless options[:max_reporting_period_secs]
       @tracer_max_flush_period_micros = options[:max_reporting_period_secs] * 1E6
     end
 
     @tracer_debug = (@tracer_options[:verbose] > 0)
 
     # Coerce invalid options into stable values
-    unless (@tracer_options[:max_log_records] > 0)
+    unless @tracer_options[:max_log_records] > 0
       @tracer_options[:max_log_records] = 1
-      self.debug_record_error('Invalid value for max_log_records')
+      debug_record_error('Invalid value for max_log_records')
     end
-    unless (@tracer_options[:max_span_records] > 0)
+    unless @tracer_options[:max_span_records] > 0
       @tracer_options[:max_span_records] = 1
-      self.debug_record_error('Invalid value for max_span_records')
+      debug_record_error('Invalid value for max_span_records')
     end
   end
 
   def guid
-    return @tracer_guid
+    @tracer_guid
   end
 
   def disable
-    self.discard
+    discard
     @tracer_enabled = false
   end
 
@@ -141,50 +137,34 @@ class ClientTracer
   end
 
   def start_span(operation_name, fields = nil)
-    unless (@tracer_enabled)
-      return NoOpSpan.new
-    end
-
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
     span.set_start_micros(@tracer_utils.now_micros)
-    span.set_tag('join:trace_id', self.generate_uuid_string)
+    span.set_tag('join:trace_id', generate_uuid_string)
 
-    unless (fields.nil?)
-      unless (fields[:parent].nil?)
-        span.set_parent(fields[:parent])
-      end
-      unless (fields[:tags].nil?)
-        span.set_tags(fields[:tags])
-      end
-      unless (fields[:startTime].nil?)
+    unless fields.nil?
+      span.set_parent(fields[:parent]) unless fields[:parent].nil?
+      span.set_tags(fields[:tags]) unless fields[:tags].nil?
+      unless fields[:startTime].nil?
         span.set_start_micros(fields[:startTime] * 1000)
       end
     end
-    return span
+    span
   end
 
   def flush
-    unless (@tracer_enabled)
-      return
-    end
+    return unless @tracer_enabled
 
     now = @tracer_utils.now_micros
 
     # The thrift configuration has not yet been set: allow logs and spans
     # to be buffered in this case, but flushes won't yet be possible.
-    if @tracer_thrift_runtime.nil?
-      return
-    end
+    return if @tracer_thrift_runtime.nil?
 
-    if (@tracer_log_records.length == 0 && @tracer_span_records.length == 0)
-      return
-    end
+    return if @tracer_log_records.empty? && @tracer_span_records.empty?
 
     # For unit testing
-    if (@tracer_options[:debug_disable_flush])
-      return
-    end
+    return if @tracer_options[:debug_disable_flush]
 
     @tracer_transport.ensure_connection(@tracer_options)
 
@@ -205,11 +185,16 @@ class ClientTracer
     thrift_counters = []
     @tracer_counters.each do |key, value|
       thrift_counters.push(NamedCounter.new(
-        :Name => key.to_s,
-        :Value => value.to_i,
+                             Name: key.to_s,
+                             Value: value.to_i
       ))
     end
-    report_request = ReportRequest.new({:runtime => @tracer_thrift_runtime, :oldest_micros => @tracer_report_start_time.to_i, :youngest_micros => now.to_i, :log_records => @tracer_log_records, :span_records => @tracer_span_records, :counters => thrift_counters})
+    report_request = ReportRequest.new(runtime: @tracer_thrift_runtime,
+                                       oldest_micros: @tracer_report_start_time.to_i,
+                                       youngest_micros: now.to_i,
+                                       log_records: @tracer_log_records,
+                                       span_records: @tracer_span_records,
+                                       counters: thrift_counters)
 
     @tracer_last_flush_micros = now
 
@@ -228,204 +213,168 @@ class ClientTracer
     # ALWAYS reset the buffers and update the counters as the RPC response
     # is, by design, not waited for and not reliable.
     @tracer_report_start_time = now
-    @tracer_log_records = Array.new
-    @tracer_span_records = Array.new
-    @tracer_counters.each do |key, value|
+    @tracer_log_records = []
+    @tracer_span_records = []
+    @tracer_counters.each do |_key, _value|
       value = 0
     end
 
     # Process server response commands
-    if (!resp.nil? && resp.commands.class.name == 'Array')
+    if !resp.nil? && resp.commands.class.name == 'Array'
       resp.commands.each do |cmd|
-        if (cmd.disable)
-          self.disable
-        end
+        disable if cmd.disable
       end
     end
   end
 
-    # Internal use only.
-    #
-    # Generates a random ID (not a *true* UUID).
-    def generate_uuid_string
-        return SecureRandom.hex(8)
-    end
-
-    # Internal use only.
-    def _finish_span(span)
-        unless (@tracer_enabled)
-            return
-        end
-        span.set_end_micros(@tracer_utils.now_micros)
-        full = self.push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
-        if full
-            @tracer_counters[:dropped_spans] += 1
-        end
-        self.flush_if_needed
-    end
-
-  # =============================================================
-   # For internal use only.
-  # =============================================================
-  def log(level, fmt, *args)
-    # The $allArgs variable contains the $fmt string
-    # args.shift
-    # text = vsprintf(fmt, allArgs)
-    text = args.join(',')
-
-    self.raw_log_record({:level => level, :message => text}, args)
-
-    self.flush_if_needed
-    return text
+  # Internal use only.
+  #
+  # Generates a random ID (not a *true* UUID).
+  def generate_uuid_string
+    @tracer_utils.generate_guid
   end
 
-    # ==============================================================
-    # Internal use only.
-    # ==============================================================
-    def raw_log_record(fields, payload_array)
-        unless (@tracer_enabled)
-          return
-        end
+  # Internal use only.
+  def _finish_span(span)
+    return unless @tracer_enabled
+    span.set_end_micros(@tracer_utils.now_micros)
+    full = push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
+    @tracer_counters[:dropped_spans] += 1 if full
+    flush_if_needed
+  end
 
-        fields[:runtime_guid] = @tracer_guid.to_s
+  # ==============================================================
+  # Internal use only.
+  # ==============================================================
+  def raw_log_record(fields, payload_array)
+    return unless @tracer_enabled
 
-        if (fields[:timestamp_micros].nil?)
-            fields[:timestamp_micros] = @tracer_utils.now_micros.to_i
-        end
+    fields[:runtime_guid] = @tracer_guid.to_s
 
-        # TODO: data scrubbing and size limiting
-        if (!payload_array.nil? && payload_array.size > 0)
-            json = JSON.generate(payload_array)
-            if (json.class.name == 'String')
-                fields[:payload_json] = json
-            end
-        end
-
-        rec = LogRecord.new(fields)
-        full = self.push_with_max(@tracer_log_records, rec, @tracer_options[:max_log_records])
-        if full
-            @tracer_counters[:dropped_logs] += 1
-        end
+    if fields[:timestamp_micros].nil?
+      fields[:timestamp_micros] = @tracer_utils.now_micros.to_i
     end
+
+    # TODO: data scrubbing and size limiting
+    if !payload_array.nil? && !payload_array.empty?
+      json = JSON.generate(payload_array)
+      fields[:payload_json] = json if json.class.name == 'String'
+    end
+
+    rec = LogRecord.new(fields)
+    full = push_with_max(@tracer_log_records, rec, @tracer_options[:max_log_records])
+    @tracer_counters[:dropped_logs] += 1 if full
+  end
 
   protected
 
-    def push_with_max(arr, item, max)
-      unless (max > 0)
-        max = 1
-      end
+  def push_with_max(arr, item, max)
+    max = 1 unless max > 0
 
-      arr << item
+    arr << item
 
-      # Simplistic random discard
-      count = arr.size
-      if (count > max)
-        i = @tracer_utils.randIntRange(0, max - 1)
-        arr[i] = arr.pop
-        return true
-      else
-        return false
-      end
+    # Simplistic random discard
+    count = arr.size
+    if count > max
+      i = rand(0..(max - 2)) # rand(a..b) is inclusive
+      arr[i] = arr.pop
+      return true
+    else
+      return false
+    end
+  end
+
+  def debug_record_error(e)
+    if @tracer_debug
+      # error_log(e)
+      puts e.to_s
+      exit(1)
+    end
+  end
+
+  # PHP does not have an event loop or timer threads. Instead manually check as
+  # new data comes in by calling this method.
+  def flush_if_needed
+    return unless @tracer_enabled
+
+    now = @tracer_utils.now_micros
+    delta = now - @tracer_last_flush_micros
+
+    # Set a bound on maximum flush frequency
+    return if delta < @tracer_min_flush_period_micros
+
+    # Set a bound of minimum flush frequency
+    if delta > @tracer_max_flush_period_micros
+      flush
+      return
     end
 
-    def debug_record_error(e)
-      if (@tracer_debug)
-        # error_log(e)
-        puts e.to_s
-        exit(1)
-      end
+    # Look for a trigger that a flush is warranted
+    if @tracer_log_records.length >= @tracer_options[:max_log_records]
+      flush
+      return
+    end
+    if @tracer_span_records.length >= @tracer_options[:max_span_records]
+      flush
+      return
+    end
+  end
+
+  def init_thrift_data_if_needed(component_name, access_token)
+    # Pre-conditions
+    if access_token.class.name != 'String'
+      puts 'access_token must be a string'
+      exit(1)
+    end
+    if component_name.class.name != 'String'
+      puts 'component_name must be a string'
+      exit(1)
+    end
+    if access_token.empty?
+      puts 'access_token must be non-zero in length'
+      exit(1)
+    end
+    if component_name.empty?
+      puts 'component_name must be non-zero in length'
+      exit(1)
     end
 
-    # PHP does not have an event loop or timer threads. Instead manually check as
-    # new data comes in by calling this method.
-    def flush_if_needed
-      unless (@tracer_enabled)
-        return
-      end
-
-      now = @tracer_utils.now_micros
-      delta = now - @tracer_last_flush_micros
-
-      # Set a bound on maximum flush frequency
-      if (delta < @tracer_min_flush_period_micros)
-        return
-      end
-
-      # Set a bound of minimum flush frequency
-      if (delta > @tracer_max_flush_period_micros)
-        self.flush
-        return
-      end
-
-      # Look for a trigger that a flush is warranted
-      if (@tracer_log_records.length >= @tracer_options[:max_log_records])
-        self.flush
-        return
-      end
-      if (@tracer_span_records.length >= @tracer_options[:max_span_records])
-        self.flush
-        return
-      end
-    end
-
-    def init_thrift_data_if_needed(component_name, access_token)
-
-      # Pre-conditions
-      if (access_token.class.name != 'String')
-        puts 'access_token must be a string'
+    # Potentially redundant initialization info: only complain if
+    # it is inconsistent.
+    if !@tracer_thrift_auth.nil? || !@tracer_thrift_runtime.nil?
+      if @tracer_thrift_auth.access_token != access_token
+        puts 'access_token cannot be changed after it is set'
         exit(1)
-      end
-      if (component_name.class.name != 'String')
-        puts 'component_name must be a string'
-        exit(1)
-      end
-      unless (access_token.size > 0)
-        puts 'access_token must be non-zero in length'
-        exit(1)
-      end
-      unless (component_name.size > 0)
-        puts 'component_name must be non-zero in length'
-        exit(1)
-      end
-
-      # Potentially redundant initialization info: only complain if
-      # it is inconsistent.
-      if (!@tracer_thrift_auth.nil? || !@tracer_thrift_runtime.nil?)
-        if (@tracer_thrift_auth.access_token != access_token)
-          puts 'access_token cannot be changed after it is set'
-          exit(1)
         end
-        if (@tracer_thrift_runtime.group_name != component_name)
-          puts 'component name cannot be changed after it is set'
-          exit(1)
-        end
-        return
+      if @tracer_thrift_runtime.group_name != component_name
+        puts 'component name cannot be changed after it is set'
+        exit(1)
       end
-
-      # Tracer attributes
-      runtime_attrs = {
-          :lightstep_tracer_platform => 'ruby',
-          :lightstep_tracer_version => Lightstep::Tracer::VERSION,
-          :ruby_version => RUBY_VERSION
-      }
-
-      # Generate the GUID on thrift initialization as the GUID should be
-      # stable for a particular access token / component name combo.
-      @tracer_guid = self.generate_uuid_string()
-      @tracer_thrift_auth = Auth.new({:access_token => access_token.to_s})
-
-      thrift_attrs = []
-      runtime_attrs.each do |key, value|
-        pair = KeyValue.new
-        pair.Key = key.to_s
-        pair.Value = value.to_s
-        thrift_attrs.push(pair)
-      end
-      @tracer_thrift_runtime = Runtime.new({
-          'guid' => @tracer_guid.to_s,
-          'start_micros' => @tracer_start_time.to_i,
-          'group_name' => component_name.to_s,
-          'attrs' => thrift_attrs
-       })
+      return
     end
+
+    # Tracer attributes
+    runtime_attrs = {
+      lightstep_tracer_platform: 'ruby',
+      lightstep_tracer_version: Lightstep::Tracer::VERSION,
+      ruby_version: RUBY_VERSION
+    }
+
+    # Generate the GUID on thrift initialization as the GUID should be
+    # stable for a particular access token / component name combo.
+    @tracer_guid = generate_uuid_string
+    @tracer_thrift_auth = Auth.new(access_token: access_token.to_s)
+
+    thrift_attrs = []
+    runtime_attrs.each do |key, value|
+      pair = KeyValue.new
+      pair.Key = key.to_s
+      pair.Value = value.to_s
+      thrift_attrs.push(pair)
+    end
+    @tracer_thrift_runtime = Runtime.new('guid' => @tracer_guid.to_s,
+                                         'start_micros' => @tracer_start_time.to_i,
+                                         'group_name' => component_name.to_s,
+                                         'attrs' => thrift_attrs)
+  end
 end

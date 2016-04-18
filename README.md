@@ -29,18 +29,18 @@ LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
 
 # Create a basic span and attach a log to the span
 span = LightStep.start_span('my_span')
-span.log_event('hello world', { 'count' => 42 })
+span.log_event('hello world', 'count' => 42)
 
 # Create a child span (and add some artificial delays to illustrate the timing)
 sleep(0.1)
-child = LightStep.start_span('my_child', { :parent => span, })
+child = LightStep.start_span('my_child', parent: span)
 sleep(0.2)
-child.finish()
+child.finish
 sleep(0.1)
-span.finish()
+span.finish
 
 # Flush any enqueued data before program exit
-LightStep.instance.flush()
+LightStep.instance.flush
 ```
 
 ## Development

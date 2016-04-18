@@ -3,6 +3,7 @@ require 'json'
 require_relative './client_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
+require_relative './transports/transport_nil'
 require_relative './thrift/types'
 require_relative './version.rb'
 
@@ -67,8 +68,8 @@ class ClientTracer
     # Set the options, merged with the defaults
     set_option(@tracer_defaults.merge(options))
 
-    @tracer_transport = if @tracer_options[:transport] == 'udp'
-                          TransportUDP.new
+    @tracer_transport = if @tracer_options[:transport] == 'nil'
+                          TransportNil.new
                         else
                           TransportHTTPJSON.new
                         end

@@ -114,4 +114,37 @@ describe LightStep do
     expect(runtime_attrs).to include('lightstep_tracer_platform', 'lightstep_tracer_version')
     expect(runtime_attrs).to include('ruby_version')
   end
+
+  it 'should report payloads correctly' do
+    # "Report" to an object so we can examine the result
+    result = nil
+    tracer = LightStep.init_new_tracer(
+      'lightstep/ruby/spec', '{your_access_token}',
+      transport: 'callback',
+      transport_callback: proc { |obj|; result = obj; })
+
+    single_payload = proc do |payload|
+      s0 = tracer.start_span('s0')
+      s0.log_event('test_event', payload)
+      s0.finish
+      tracer.flush
+      JSON.generate(JSON.parse(result['log_records'][0]['payload_json']))
+    end
+
+    # NOTE: these comparisons rely on Ruby generating a consistent ordering to
+    # map keys
+
+    # TODO: these tests are aligned to the current behavior that primitive types
+    # are prefixed with a "payload" key
+    expect(single_payload.call(0)).to eq(JSON.generate(payload: 0))
+    expect(single_payload.call(-1)).to eq(JSON.generate(payload: -1))
+    expect(single_payload.call('test')).to eq(JSON.generate(payload: 'test'))
+    expect(single_payload.call(true)).to eq(JSON.generate(payload: true))
+
+    expect(single_payload.call([])).to eq(JSON.generate([]))
+    expect(single_payload.call([1, 2, 3])).to eq(JSON.generate([1, 2, 3]))
+    expect(single_payload.call({})).to eq(JSON.generate({}))
+    expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
+    expect(single_payload.call(x: 'y', a: 'b')).to eq(JSON.generate(x: 'y', a: 'b'))
+  end
 end

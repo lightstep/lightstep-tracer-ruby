@@ -4,6 +4,7 @@ require_relative './client_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
 require_relative './transports/transport_nil'
+require_relative './transports/transport_callback'
 require_relative './thrift/types'
 require_relative './version.rb'
 
@@ -56,17 +57,13 @@ class ClientTracer
       @tracer_defaults[:collector_port] = options[:collector_secure] ? 443 : 80
     end
 
-    # UDP has significantly lower size contraints
-    if !options[:transport].nil? && options[:transport] == 'udp'
-      @tracer_defaults[:max_log_records] = 16
-      @tracer_defaults[:max_span_records] = 16
-    end
-
     # Set the options, merged with the defaults
-    set_option(@tracer_defaults.merge(options))
+    set_options(@tracer_defaults.merge(options))
 
     @tracer_transport = if @tracer_options[:transport] == 'nil'
                           TransportNil.new
+                        elsif @tracer_options[:transport] == 'callback'
+                          TransportCallback.new
                         else
                           TransportHTTPJSON.new
                         end
@@ -78,16 +75,11 @@ class ClientTracer
     @tracer_last_flush_micros = @tracer_start_time
   end
 
-  # def self.finalize(bar)
-  #   puts "DESTROY OBJECT #{bar}"
-  #   exit(0)
-  # end
-
   def finalize
     flush
   end
 
-  def set_option(options)
+  def set_options(options)
     @tracer_options.merge!(options)
 
     # Deferred group name / access token initialization is supported (i.e.
@@ -151,6 +143,12 @@ class ClientTracer
   end
 
   def flush
+    # TODO: the outer method has been split from the worker to eventually
+    # support a background reporting Thread.
+    _flush_worker
+  end
+
+  def _flush_worker
     return unless @tracer_enabled
 
     now = @tracer_utils.now_micros
@@ -177,12 +175,8 @@ class ClientTracer
     end
 
     # Convert the counters to thrift form
-    thrift_counters = []
-    @tracer_counters.each do |key, value|
-      thrift_counters.push(NamedCounter.new(
-                             Name: key.to_s,
-                             Value: value.to_i
-      ))
+    thrift_counters = @tracer_counters.map do |key, value|
+      NamedCounter.new(Name: key.to_s, Value: value.to_i)
     end
     report_request = ReportRequest.new(runtime: @tracer_thrift_runtime,
                                        oldest_micros: @tracer_report_start_time.to_i,
@@ -193,17 +187,7 @@ class ClientTracer
 
     @tracer_last_flush_micros = now
 
-    resp = nil
-    # try {
-    #   # It *is* valid for the transport to return a null response in the
-    #   # case of a low-overhead "fire and forget" report
     resp = @tracer_transport.flush_report(@tracer_thrift_auth, report_request)
-    # } catch (\Exception $e) {
-    #   # Exceptions *are* expected as connections can be broken, etc. when
-    #   # reporting. Prevent reporting exceptions from interfering with the
-    #   # client code.
-    #   $this->debug_record_error($e);
-    # end
 
     # ALWAYS reset the buffers and update the counters as the RPC response
     # is, by design, not waited for and not reliable.
@@ -211,7 +195,7 @@ class ClientTracer
     @tracer_log_records = []
     @tracer_span_records = []
     @tracer_counters.each do |_key, _value|
-      value = 0
+      _value = 0
     end
 
     # Process server response commands
@@ -241,7 +225,7 @@ class ClientTracer
   # ==============================================================
   # Internal use only.
   # ==============================================================
-  def raw_log_record(fields, payload_array)
+  def raw_log_record(fields, _payload)
     return unless @tracer_enabled
 
     fields[:runtime_guid] = @tracer_guid.to_s
@@ -251,10 +235,15 @@ class ClientTracer
     end
 
     # TODO: data scrubbing and size limiting
-    if !payload_array.nil? && !payload_array.empty?
-      json = JSON.generate(payload_array)
-      fields[:payload_json] = json if json.class.name == 'String'
+    json = nil
+    if _payload.is_a?(Array) || _payload.is_a?(Hash)
+      json = JSON.generate(_payload)
+    elsif !_payload.nil?
+      # TODO: Remove the outer 'payload' key wrapper. Just transport the JSON
+      # Value (Value in the sense of the JSON spec).
+      json = JSON.generate(payload: _payload)
     end
+    fields[:payload_json] = json if json.class.name == 'String'
 
     rec = LogRecord.new(fields)
     full = push_with_max(@tracer_log_records, rec, @tracer_options[:max_log_records])

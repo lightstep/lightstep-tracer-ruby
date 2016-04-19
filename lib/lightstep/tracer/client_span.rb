@@ -75,7 +75,7 @@ class ClientSpan
   end
 
   def log_event(event, payload = nil)
-    log('event' => event.to_s, 'payload' => payload)
+    log(event: event.to_s, payload: payload)
   end
 
   def log(fields)
@@ -91,14 +91,12 @@ class ClientSpan
   def to_thrift
     # Coerce all the types to strings to ensure there are no encoding/decoding
     # issues
-    join_ids = []
-    @join_ids.each do |key, value|
-      join_ids << TraceJoinId.new(TraceKey: key.to_s, Value: value.to_s)
+    join_ids = @join_ids.map do |key, value|
+      TraceJoinId.new(TraceKey: key.to_s, Value: value.to_s)
     end
 
-    attributes = []
-    @tags.each do |key, value|
-      attributes << KeyValue.new(Key: key.to_s, Value: value.to_s)
+    attributes = @tags.map do |key, value|
+      KeyValue.new(Key: key.to_s, Value: value.to_s)
     end
 
     rec = SpanRecord.new(runtime_guid: @tracer.guid.to_s,

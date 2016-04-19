@@ -30,7 +30,6 @@ class ClientTracer
       dropped_logs: 0,
       dropped_spans: 0
     }
-    @tracer_flush_active = FALSE
     @tracer_last_flush_micros = 0
     @tracer_min_flush_period_micros = 500 * 1000
     @tracer_max_flush_period_micros = 30_000 * 1000

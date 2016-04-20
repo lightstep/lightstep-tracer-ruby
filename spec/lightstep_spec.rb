@@ -155,4 +155,27 @@ describe LightStep do
     expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
     expect(single_payload.call(x: 'y', a: 'b')).to eq(JSON.generate(x: 'y', a: 'b'))
   end
+
+  it 'should handle inject/join for text carriers' do
+    tracer = init_test_tracer
+    span1 = tracer.start_span('test_span')
+    span1.set_baggage_item('footwear', 'cleats')
+    span1.set_baggage_item('umbrella', 'golf')
+
+    carrier = {}
+    tracer.inject(span1, LightStep.FORMAT_TEXT_MAP, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.trace_guid)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.guid)
+    expect(carrier['ot-baggage-footwear']).to eq('cleats')
+    expect(carrier['ot-baggage-umbrella']).to eq('golf')
+
+    span2 = tracer.join('test_span_2', LightStep.FORMAT_TEXT_MAP, carrier)
+    expect(span2.trace_guid).to eq(span1.trace_guid)
+    expect(span2.parent_guid).to eq(span1.guid)
+    expect(span2.get_baggage_item('footwear')).to eq('cleats')
+    expect(span2.get_baggage_item('umbrella')).to eq('golf')
+
+    span1.finish
+    span2.finish
+  end
 end

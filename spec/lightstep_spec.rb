@@ -52,6 +52,14 @@ describe LightStep do
     span.finish
   end
 
+  it 'should generate string span guids' do
+    tracer = init_test_tracer
+    span = tracer.start_span('test_span')
+
+    expect(span.guid).to be_an_instance_of String
+    span.finish
+  end
+
   it 'should handle all valid payloads types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')

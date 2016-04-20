@@ -6,7 +6,7 @@ class Util
   # Returns a random guid. Note: this intentionally does not use SecureRandom,
   # which is slower and cryptographically secure randomness is not required here.
   def generate_guid
-    @rng.bytes(8).unpack('H*')
+    @rng.bytes(8).unpack('H*')[0]
   end
 
   def now_micros

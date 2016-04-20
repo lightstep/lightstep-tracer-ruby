@@ -10,7 +10,7 @@ tracer = LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}',
 
 Benchmark.bm(32) do |x|
   x.report('Random.bytes.unpack') do
-    for i in 1..10_000; rng.bytes(8).unpack('H*'); end
+    for i in 1..10_000; rng.bytes(8).unpack('H*')[0]; end
   end
   x.report('Random.bytes.each_byte.map') do
     for i in 1..10_000; rng.bytes(8).each_byte.map { |b| b.to_s(16) }.join; end

@@ -1,5 +1,5 @@
 module Lightstep
   module Tracer
-    VERSION = '0.1.17'.freeze
+    VERSION = '0.8.0'.freeze
   end
 end

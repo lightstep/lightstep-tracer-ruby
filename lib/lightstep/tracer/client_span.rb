@@ -2,51 +2,11 @@ require_relative './util'
 require_relative './thrift/types'
 
 class ClientSpan
-  attr_reader :tracer, :guid, :operation, :tags, :baggage, :start_micros, :end_micros, :error_flag, :join_ids
-
-  def initialize(tracer)
-    @guid = ''
-    @operation = ''
-    @tags = {}
-    @baggage = {}
-    @start_micros = 0
-    @end_micros = 0
-    @error_flag = false
-    @join_ids = {}
-
-    @tracer = tracer
-    @guid = tracer.generate_uuid_string
-  end
-
-  def finalize
-    if @end_micros == 0
-      # TODO: Notify about that finish() was never called for this span
-      finish
-    end
-  end
+  # ----------------------------------------------------------------------------
+  #  OpenTracing API
+  # ----------------------------------------------------------------------------
 
   attr_reader :tracer
-
-  attr_reader :guid
-
-  def set_start_micros(start)
-    @start_micros = start
-    self
-  end
-
-  def set_end_micros(start)
-    @end_micros = start
-    self
-  end
-
-  def finish
-    @tracer._finish_span(self)
-  end
-
-  def set_operation_name(name)
-    @operation = name
-    self
-  end
 
   def set_tag(key, value)
     @tags[key] = value
@@ -60,18 +20,6 @@ class ClientSpan
 
   def get_baggage_item(key)
     @baggage[key]
-  end
-
-  def set_parent(span)
-    # Inherit any join IDs from the parent that have not been explicitly
-    # set on the child
-    span.join_ids.each do |key, value|
-      @join_ids[key] = value unless @join_ids.key?(key)
-    end
-
-    set_tag(:parent_span_guid, span.guid)
-    set_tag('join:trace_id', span.tags['join:trace_id'])
-    self
   end
 
   def log_event(event, payload = nil)
@@ -88,13 +36,68 @@ class ClientSpan
     @tracer.raw_log_record(record, fields[:payload])
   end
 
+  def finish
+    @tracer._finish_span(self)
+  end
+
+  # ----------------------------------------------------------------------------
+  # Implemenation specific
+  # ----------------------------------------------------------------------------
+
+  def initialize(tracer)
+    @guid = ''
+    @operation = ''
+    @tags = {}
+    @baggage = {}
+    @start_micros = 0
+    @end_micros = 0
+    @error_flag = false
+
+    @tracer = tracer
+    @guid = tracer.generate_uuid_string
+  end
+
+  attr_reader :guid, :operation, :tags, :baggage, :start_micros, :end_micros, :error_flag
+
+  def finalize
+    if @end_micros == 0
+      # TODO: Notify about that finish() was never called for this span
+      finish
+    end
+  end
+
+  def set_start_micros(start)
+    @start_micros = start
+    self
+  end
+
+  def set_end_micros(start)
+    @end_micros = start
+    self
+  end
+
+  def set_operation_name(name)
+    @operation = name
+    self
+  end
+
+  def trace_guid
+    @tags['join:trace_id']
+  end
+
+  def parent_guid
+    @tags[:parent_span_guid]
+  end
+
+  def set_parent(span)
+    set_tag(:parent_span_guid, span.guid)
+    set_tag('join:trace_id', span.tags['join:trace_id'])
+    self
+  end
+
   def to_thrift
     # Coerce all the types to strings to ensure there are no encoding/decoding
     # issues
-    join_ids = @join_ids.map do |key, value|
-      TraceJoinId.new(TraceKey: key.to_s, Value: value.to_s)
-    end
-
     attributes = @tags.map do |key, value|
       KeyValue.new(Key: key.to_s, Value: value.to_s)
     end
@@ -105,7 +108,6 @@ class ClientSpan
                          attributes: attributes,
                          oldest_micros: @start_micros.to_i,
                          youngest_micros: @end_micros.to_i,
-                         join_ids: join_ids,
                          error_flag: @error_flag)
   end
 end

@@ -44,4 +44,13 @@ Benchmark.bm(32) do |x|
     for i in 0..10_000; span.log_event('event', i); end
     span.finish
   end
+
+  x.report('inject(10000)') do
+    span = tracer.start_span('my_span')
+    for i in 0..10_000
+      carrier = {}
+      tracer.inject(span, LightStep.FORMAT_TEXT_MAP, carrier)
+     end
+    span.finish
+  end
 end

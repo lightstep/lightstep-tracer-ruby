@@ -1,5 +1,6 @@
 require 'json'
 
+require_relative './constants'
 require_relative './client_span'
 require_relative './util'
 require_relative './transports/transport_http_json'
@@ -8,11 +9,55 @@ require_relative './transports/transport_callback'
 require_relative './thrift/types'
 require_relative './version.rb'
 
-# ============================================================
-# Main implementation of the Tracer interface
-# =============================================================
-
 class ClientTracer
+  # ----------------------------------------------------------------------------
+  #  OpenTracing API
+  # ----------------------------------------------------------------------------
+
+  def start_span(operation_name, fields = nil)
+    span = ClientSpan.new(self)
+    span.set_operation_name(operation_name)
+    span.set_start_micros(@tracer_utils.now_micros)
+    span.set_tag('join:trace_id', generate_uuid_string)
+
+    unless fields.nil?
+      span.set_parent(fields[:parent]) unless fields[:parent].nil?
+      span.set_tags(fields[:tags]) unless fields[:tags].nil?
+      unless fields[:startTime].nil?
+        span.set_start_micros(fields[:startTime] * 1000)
+      end
+    end
+    span
+  end
+
+  def inject(span, format, carrier)
+    case format
+    when Lightstep::Tracer::FORMAT_TEXT_MAP
+      _inject_to_text_map(span, carrier)
+    when Lightstep::Tracer::FORMAT_BINARY
+      warn 'Binary inject format not yet implemented'
+    else
+      warn 'Unknown inject format'
+    end
+  end
+
+  def join(operation_name, format, carrier)
+    case format
+    when Lightstep::Tracer::FORMAT_TEXT_MAP
+      _join_from_text_map(operation_name, carrier)
+    when Lightstep::Tracer::FORMAT_BINARY
+      warn 'Binary join format not yet implemented'
+      nil
+    else
+      warn 'Unknown join format'
+      nil
+    end
+  end
+
+  # ----------------------------------------------------------------------------
+  # Implemenation specific
+  # ----------------------------------------------------------------------------
+
   def initialize(options = {})
     @tracer_utils = Util.new
     @tracer_options = {}
@@ -108,6 +153,34 @@ class ClientTracer
     end
   end
 
+  def _inject_to_text_map(span, carrier)
+    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
+    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_guid unless span.trace_guid.nil?
+    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
+
+    span.baggage.each do |key, value|
+      carrier[Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX + key] = value
+    end
+  end
+
+  def _join_from_text_map(operation_name, carrier)
+    span = ClientSpan.new(self)
+    span.set_operation_name(operation_name)
+    span.set_start_micros(@tracer_utils.now_micros)
+
+    parent_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid']
+    trace_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid']
+    span.set_tag('join:trace_id', trace_guid)
+    span.set_tag(:parent_span_guid, parent_guid)
+
+    carrier.each do |key, value|
+      next unless key.start_with?(Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX)
+      plain_key = key.to_s[Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
+      span.set_baggage_item(plain_key, value)
+    end
+    span
+  end
+
   def guid
     @tracer_guid
   end
@@ -115,31 +188,6 @@ class ClientTracer
   def disable
     discard
     @tracer_enabled = false
-  end
-
-  # ===========================================================
-  # Internal use only.
-  # Discard all currently buffered data.  Useful for unit testing.
-  # ===========================================================
-  def discard
-    @tracer_log_records = {}
-    @tracer_span_records = {}
-  end
-
-  def start_span(operation_name, fields = nil)
-    span = ClientSpan.new(self)
-    span.set_operation_name(operation_name)
-    span.set_start_micros(@tracer_utils.now_micros)
-    span.set_tag('join:trace_id', generate_uuid_string)
-
-    unless fields.nil?
-      span.set_parent(fields[:parent]) unless fields[:parent].nil?
-      span.set_tags(fields[:tags]) unless fields[:tags].nil?
-      unless fields[:startTime].nil?
-        span.set_start_micros(fields[:startTime] * 1000)
-      end
-    end
-    span
   end
 
   def flush
@@ -194,8 +242,8 @@ class ClientTracer
     @tracer_report_start_time = now
     @tracer_log_records = []
     @tracer_span_records = []
-    @tracer_counters.each do |_key, _value|
-      _value = 0
+    @tracer_counters.each do |key, _value|
+      @tracer_counters[key] = 0
     end
 
     # Process server response commands
@@ -222,9 +270,6 @@ class ClientTracer
     flush_if_needed
   end
 
-  # ==============================================================
-  # Internal use only.
-  # ==============================================================
   def raw_log_record(fields, _payload)
     return unless @tracer_enabled
 

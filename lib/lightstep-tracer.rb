@@ -1,17 +1,18 @@
 require_relative './lightstep/tracer/thrift/types'
 require_relative './lightstep/tracer/client_tracer'
+require_relative './lightstep/tracer/constants'
 
 module LightStep
   @@instance = nil
 
-  # Initializes and returns the singleton instance of the Tracer.
-  # For convenience, multiple calls to initialize are allowed. For example,
-  # in library code with more than possible first entry-point, this may
-  # be helpful.
-  #
-  # @return LightStepBase_Tracer
-  # @throws Exception if the component name or access token is not a valid string
-  # @throws Exception if the tracer singleton has already been initialized
+  def self.FORMAT_TEXT_MAP
+    Lightstep::Tracer::FORMAT_TEXT_MAP
+  end
+
+  def self.FORMAT_BINARY
+    Lightstep::Tracer::FORMAT_BINARY
+  end
+
   def self.init_global_tracer(component_name, access_token, opts = nil)
     if component_name.class.name != 'String' || component_name.empty?
       puts "Invalid component_name: #{component_name}"

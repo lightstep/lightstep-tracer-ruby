@@ -1,4 +1,5 @@
 require 'json'
+require 'weakref'
 
 require_relative './constants'
 require_relative './client_span'
@@ -118,6 +119,8 @@ class ClientTracer
     @tracer_start_time = @tracer_utils.now_micros
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros = @tracer_start_time
+
+    ObjectSpace.define_finalizer(WeakRef.new(self), proc { flush })
   end
 
   def finalize

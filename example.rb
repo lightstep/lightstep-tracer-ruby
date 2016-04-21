@@ -16,5 +16,4 @@ child.finish
 sleep(0.1)
 span.finish
 
-LightStep.instance.flush
 puts 'Done!'

@@ -24,3 +24,4 @@ thrift:
 	thrift -r -gen rb -out lib/lightstep/tracer/thrift $(LIGHTSTEP_HOME)/go/src/crouton/crouton.thrift
 	rm lib/lightstep/tracer/thrift/reporting_service.rb
 	rm lib/lightstep/tracer/thrift/crouton_constants.rb
+	ruby scripts/patch_thrift.rb

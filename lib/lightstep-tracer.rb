@@ -1,4 +1,4 @@
-require_relative './lightstep/tracer/thrift/types'
+require_relative './lightstep/tracer/thrift/crouton_types'
 require_relative './lightstep/tracer/client_tracer'
 require_relative './lightstep/tracer/constants'
 

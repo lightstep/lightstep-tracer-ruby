@@ -38,9 +38,6 @@ sleep(0.2)
 child.finish
 sleep(0.1)
 span.finish
-
-# Flush any enqueued data before program exit
-LightStep.instance.flush
 ```
 
 ## Development

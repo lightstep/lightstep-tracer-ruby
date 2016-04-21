@@ -9,4 +9,7 @@ class TransportNil
   def flush_report(_auth, _report)
     nil
   end
+
+  def close
+  end
 end

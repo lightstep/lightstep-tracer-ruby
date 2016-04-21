@@ -15,4 +15,7 @@ class TransportCallback
     @callback.call(content)
     nil
   end
+
+  def close
+  end
 end

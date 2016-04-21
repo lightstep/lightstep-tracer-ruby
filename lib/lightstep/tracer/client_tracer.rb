@@ -78,7 +78,7 @@ class ClientTracer
     }
     @tracer_last_flush_micros = 0
     @tracer_min_flush_period_micros = 500 * 1000
-    @tracer_max_flush_period_micros = 30_000 * 1000
+    @tracer_max_flush_period_micros = 3_000 * 1000
 
     @tracer_defaults = {
       collector_host: 'collector.lightstep.com',
@@ -120,7 +120,10 @@ class ClientTracer
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros = @tracer_start_time
 
-    ObjectSpace.define_finalizer(WeakRef.new(self), proc { flush })
+    ObjectSpace.define_finalizer(WeakRef.new(self), proc do
+                                                      flush
+                                                      @tracer_transport.close
+                                                    end)
   end
 
   def finalize

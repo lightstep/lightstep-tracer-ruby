@@ -6,17 +6,27 @@ LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}', {
                                #:collector_encryption => 'none',
                              })
 
-for i in 1..50
-  puts '     Iteration ' + i.to_s
-  span = LightStep.start_span('my_span')
-  span.log_event('hello world', 'count' => 42)
-
-  sleep(0.1)
-  child = LightStep.start_span('my_child', parent: span)
-  sleep(0.2)
-  child.finish
-  sleep(0.1)
-  span.finish
+puts 'Starting operation...'
+span = LightStep.start_span('my_span')
+thread1 = Thread.new do
+  for i in 1..10
+    sleep(0.8)
+    puts "Logging event #{i}..."
+    span.log_event('hello world', count: i)
+  end
 end
+thread2 = Thread.new do
+  current = 1
+  for i in 1..16
+    child = LightStep.start_span('my_child', parent: span)
+    sleep(0.2)
+    current *= 2
+    child.log_event("2^#{i}", result: current)
+    child.finish
+  end
+end
+[thread1, thread2].each(&:join)
+span.finish
 
 puts 'Done!'
+puts span.generate_trace_url

@@ -120,14 +120,14 @@ class ClientTracer
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros = @tracer_start_time
 
-    ObjectSpace.define_finalizer(WeakRef.new(self), proc do
-                                                      flush
-                                                      @tracer_transport.close
-                                                    end)
+    at_exit do
+      _final_flush
+    end
   end
 
-  def finalize
+  def _final_flush
     flush
+    @tracer_transport.close
   end
 
   def set_options(options)
@@ -189,6 +189,10 @@ class ClientTracer
 
   def guid
     @tracer_guid
+  end
+
+  def access_token
+    @tracer_options[:access_token]
   end
 
   def disable

@@ -89,6 +89,10 @@ class ClientSpan
     @tags[:parent_span_guid]
   end
 
+  def generate_trace_url
+    "https://app.lightstep.com/#{@tracer.access_token}/trace?span_guid=#{@guid}&at_micros=#{start_micros}"
+  end
+
   def set_parent(span)
     set_tag(:parent_span_guid, span.guid)
     set_tag('join:trace_id', span.tags['join:trace_id'])

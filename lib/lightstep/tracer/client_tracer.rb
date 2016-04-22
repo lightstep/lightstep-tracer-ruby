@@ -78,7 +78,7 @@ class ClientTracer
     }
     @tracer_last_flush_micros = 0
     @tracer_min_flush_period_micros = 500 * 1000
-    @tracer_max_flush_period_micros = 3_000 * 1000
+    @tracer_max_flush_period_micros = 30_000 * 1000
 
     @tracer_defaults = {
       collector_host: 'collector.lightstep.com',
@@ -120,14 +120,12 @@ class ClientTracer
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros = @tracer_start_time
 
+    # At exit, flush this objects data to the transport and close the transport
+    # (which in turn will send the flushed data over the network).
     at_exit do
-      _final_flush
+      flush
+      @tracer_transport.close
     end
-  end
-
-  def _final_flush
-    flush
-    @tracer_transport.close
   end
 
   def set_options(options)

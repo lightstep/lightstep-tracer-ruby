@@ -63,7 +63,6 @@ class ClientTracer
     @tracer_utils = Util.new
     @tracer_options = {}
     @tracer_enabled = true
-    @tracer_debug = false
     @tracer_guid = ''
     @tracer_start_time = @tracer_utils.now_micros
     @tracer_thrift_auth = nil
@@ -143,8 +142,6 @@ class ClientTracer
     unless options[:max_reporting_period_secs]
       @tracer_max_flush_period_micros = options[:max_reporting_period_secs] * 1E6
     end
-
-    @tracer_debug = (@tracer_options[:verbose] > 0)
 
     # Coerce invalid options into stable values
     unless @tracer_options[:max_log_records] > 0
@@ -322,9 +319,8 @@ class ClientTracer
   end
 
   def debug_record_error(e)
-    if @tracer_debug
-      # error_log(e)
-      puts e.to_s
+    if @tracer_options[:verbose] >= 2
+      warn e.to_s
       exit(1)
     end
   end
@@ -340,39 +336,31 @@ class ClientTracer
     # Set a bound on maximum flush frequency
     return if delta < @tracer_min_flush_period_micros
 
-    # Set a bound of minimum flush frequency
-    if delta > @tracer_max_flush_period_micros
-      flush
-      return
-    end
-
     # Look for a trigger that a flush is warranted
-    if @tracer_log_records.length >= @tracer_options[:max_log_records]
+    # Set a bound of minimum flush frequency
+    if delta > @tracer_max_flush_period_micros ||
+       @tracer_log_records.length >= @tracer_options[:max_log_records] ||
+       @tracer_span_records.length >= @tracer_options[:max_span_records]
       flush
-      return
-    end
-    if @tracer_span_records.length >= @tracer_options[:max_span_records]
-      flush
-      return
     end
   end
 
   def init_thrift_data_if_needed(component_name, access_token)
     # Pre-conditions
     if access_token.class.name != 'String'
-      puts 'access_token must be a string'
+      warn 'access_token must be a string'
       exit(1)
     end
     if component_name.class.name != 'String'
-      puts 'component_name must be a string'
+      warn 'component_name must be a string'
       exit(1)
     end
     if access_token.empty?
-      puts 'access_token must be non-zero in length'
+      warn 'access_token must be non-zero in length'
       exit(1)
     end
     if component_name.empty?
-      puts 'component_name must be non-zero in length'
+      warn 'component_name must be non-zero in length'
       exit(1)
     end
 
@@ -380,11 +368,11 @@ class ClientTracer
     # it is inconsistent.
     if !@tracer_thrift_auth.nil? || !@tracer_thrift_runtime.nil?
       if @tracer_thrift_auth.access_token != access_token
-        puts 'access_token cannot be changed after it is set'
+        warn 'access_token cannot be changed after it is set'
         exit(1)
         end
       if @tracer_thrift_runtime.group_name != component_name
-        puts 'component name cannot be changed after it is set'
+        warn 'component name cannot be changed after it is set'
         exit(1)
       end
       return

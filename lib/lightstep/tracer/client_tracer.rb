@@ -7,7 +7,7 @@ require_relative './util'
 require_relative './transports/transport_http_json'
 require_relative './transports/transport_nil'
 require_relative './transports/transport_callback'
-require_relative './thrift/types'
+require_relative './thrift/crouton_types'
 require_relative './version.rb'
 
 class ClientTracer

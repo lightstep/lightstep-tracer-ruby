@@ -5,6 +5,13 @@ def init_test_tracer
   LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}', transport: 'nil')
 end
 
+def init_callback_tracer(callback)
+  tracer = LightStep.init_new_tracer(
+    'lightstep/ruby/spec', '{your_access_token}',
+    transport: 'callback',
+    transport_callback: callback)
+end
+
 describe LightStep do
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
@@ -101,11 +108,7 @@ describe LightStep do
   it 'should report standard fields' do
     # "Report" to an object so we can examine the result
     result = nil
-    tracer = LightStep.init_new_tracer(
-      'lightstep/ruby/spec', '{your_access_token}',
-      transport: 'callback',
-      transport_callback: proc { |obj|; result = obj; })
-
+    tracer = init_callback_tracer(proc { |obj|; result = obj; })
     s0 = tracer.start_span('s0')
     s0.log_event('test_event')
     s0.finish
@@ -177,5 +180,57 @@ describe LightStep do
 
     span1.finish
     span2.finish
+  end
+
+  it 'should handle concurrent spans' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj|; result = obj; })
+    parent = tracer.start_span('parent_span')
+    threads = *(1..64).map do |i|
+      Thread.new do
+        child = tracer.start_span("child_span_#{i}")
+        for j in 1..10
+          sleep 0.01
+          child.log_event('message', j)
+        end
+        child.finish
+      end
+    end
+    threads.each(&:join)
+    parent.finish
+    tracer.flush
+
+    expect(result['span_records'].length).to eq(65)
+    expect(result['log_records'].length).to eq(64 * 10)
+  end
+
+  it 'should handle concurrent tracers' do
+    results = {}
+    outer_threads = *(1..8).to_a.map do |k|
+                      Thread.new do
+                        tracer = init_callback_tracer(proc { |obj|; results[k] = obj; })
+                        parent = tracer.start_span('parent_span')
+                        threads = *(1..16).map do |i|
+                          Thread.new do
+                            child = tracer.start_span("child_span_#{i}")
+                            for j in 1..10
+                              sleep 0.01
+                              child.log_event('message', j)
+                            end
+                            child.finish
+                          end
+                        end
+                        threads.each(&:join)
+                        parent.finish
+
+                        tracer.flush
+                      end
+                    end
+    outer_threads.each(&:join)
+    for i in 1..8
+      r = results[i]
+      expect(r['span_records'].length).to eq(17)
+      expect(r['log_records'].length).to eq(16 * 10)
+    end
   end
 end

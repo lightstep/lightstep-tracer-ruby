@@ -19,7 +19,6 @@ class ClientTracer
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
     span.set_start_micros(@tracer_utils.now_micros)
-    span.set_tag('join:trace_id', generate_uuid_string)
 
     unless fields.nil?
       span.set_parent(fields[:parent]) unless fields[:parent].nil?
@@ -28,6 +27,8 @@ class ClientTracer
         span.set_start_micros(fields[:startTime] * 1000)
       end
     end
+
+    span.trace_guid = generate_uuid_string if span.trace_guid.nil?
     span
   end
 
@@ -171,7 +172,7 @@ class ClientTracer
 
     parent_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid']
     trace_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid']
-    span.set_tag('join:trace_id', trace_guid)
+    span.trace_guid = trace_guid
     span.set_tag(:parent_span_guid, parent_guid)
 
     carrier.each do |key, value|

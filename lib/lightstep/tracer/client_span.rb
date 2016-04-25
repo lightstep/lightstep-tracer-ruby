@@ -47,6 +47,7 @@ class ClientSpan
   def initialize(tracer)
     @guid = ''
     @operation = ''
+    @trace_guid = nil
     @tags = {}
     @baggage = {}
     @start_micros = 0
@@ -58,6 +59,7 @@ class ClientSpan
   end
 
   attr_reader :guid, :operation, :tags, :baggage, :start_micros, :end_micros, :error_flag
+  attr_accessor :trace_guid
 
   def finalize
     if @end_micros == 0
@@ -81,10 +83,6 @@ class ClientSpan
     self
   end
 
-  def trace_guid
-    @tags['join:trace_id']
-  end
-
   def parent_guid
     @tags[:parent_span_guid]
   end
@@ -95,7 +93,7 @@ class ClientSpan
 
   def set_parent(span)
     set_tag(:parent_span_guid, span.guid)
-    set_tag('join:trace_id', span.tags['join:trace_id'])
+    @trace_guid = span.trace_guid
     self
   end
 

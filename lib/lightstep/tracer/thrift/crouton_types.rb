@@ -129,6 +129,7 @@ end
 class SpanRecord
   include ::Thrift::Struct, ::Thrift::Struct_Union
   SPAN_GUID = 1
+  TRACE_GUID = 11
   RUNTIME_GUID = 2
   SPAN_NAME = 3
   JOIN_IDS = 4
@@ -140,6 +141,7 @@ class SpanRecord
 
   FIELDS = {
     SPAN_GUID => {:type => ::Thrift::Types::STRING, :name => 'span_guid', :optional => true},
+    TRACE_GUID => {:type => ::Thrift::Types::STRING, :name => 'trace_guid', :optional => true},
     RUNTIME_GUID => {:type => ::Thrift::Types::STRING, :name => 'runtime_guid', :optional => true},
     SPAN_NAME => {:type => ::Thrift::Types::STRING, :name => 'span_name', :optional => true},
     JOIN_IDS => {:type => ::Thrift::Types::LIST, :name => 'join_ids', :element => {:type => ::Thrift::Types::STRUCT, :class => ::TraceJoinId}, :optional => true},

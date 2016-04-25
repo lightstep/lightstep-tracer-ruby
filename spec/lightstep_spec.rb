@@ -67,6 +67,32 @@ describe LightStep do
     span.finish
   end
 
+  it 'should assign the same trace_guid to child spans as the parent' do
+    tracer = init_test_tracer
+    parent1 = tracer.start_span('parent1')
+    parent2 = tracer.start_span('parent2')
+
+    children1 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent1) }
+    children2 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent2) }
+
+    children1.each do |child|
+      expect(child.trace_guid).to be_an_instance_of String
+      expect(child.trace_guid).to eq(parent1.trace_guid)
+      expect(child.trace_guid).not_to eq(parent2.trace_guid)
+    end
+
+    children2.each do |child|
+      expect(child.trace_guid).to be_an_instance_of String
+      expect(child.trace_guid).to eq(parent2.trace_guid)
+      expect(child.trace_guid).not_to eq(parent1.trace_guid)
+    end
+
+    children1.each(&:finish)
+    children2.each(&:finish)
+    parent1.finish
+    parent2.finish
+  end
+
   it 'should handle all valid payloads types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')

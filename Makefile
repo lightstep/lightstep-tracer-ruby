@@ -9,6 +9,7 @@ test:
 
 benchmark:
 	ruby benchmark/bench.rb
+	ruby benchmark/threading/thread_test.rb
 
 publish: build test benchmark
 	ruby -e 'require "bump"; Bump::Bump.run("patch")'

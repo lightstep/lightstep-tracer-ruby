@@ -13,7 +13,7 @@ total_time = 0
 
 watchThread = Thread.new do
   loop do
-    sleep(3.0)
+    sleep(0.5)
     mutex.lock
     time_per_span = (1e6 * (total_time.to_f / span_count.to_f)).round(2)
     puts "#{span_count} spans #{percent_done}% done #{total_time.round(2)} seconds (#{time_per_span} us/span)"

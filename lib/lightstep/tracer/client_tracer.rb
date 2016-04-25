@@ -76,8 +76,8 @@ class ClientTracer
       dropped_spans: 0
     }
     @tracer_last_flush_micros = 0
-    @tracer_min_flush_period_micros = 500 * 1000
-    @tracer_max_flush_period_micros = 30_000 * 1000
+    @tracer_min_flush_period_micros = 0 # Initialized below by the default options
+    @tracer_max_flush_period_micros = 0 # Initialized below by the default options
 
     @tracer_defaults = {
       collector_host: 'collector.lightstep.com',
@@ -86,8 +86,8 @@ class ClientTracer
       transport: 'http_json',
       max_log_records: 1000,
       max_span_records: 1000,
-      min_reporting_period_secs: 0.1,
-      max_reporting_period_secs: 5.0,
+      min_reporting_period_secs: 1.5,
+      max_reporting_period_secs: 30.0,
 
       max_payload_depth: 10,
 
@@ -325,8 +325,6 @@ class ClientTracer
     end
   end
 
-  # PHP does not have an event loop or timer threads. Instead manually check as
-  # new data comes in by calling this method.
   def flush_if_needed
     return unless @tracer_enabled
 
@@ -339,8 +337,8 @@ class ClientTracer
     # Look for a trigger that a flush is warranted
     # Set a bound of minimum flush frequency
     if delta > @tracer_max_flush_period_micros ||
-       @tracer_log_records.length >= @tracer_options[:max_log_records] ||
-       @tracer_span_records.length >= @tracer_options[:max_span_records]
+       @tracer_log_records.length >= @tracer_options[:max_log_records] / 2 ||
+       @tracer_span_records.length >= @tracer_options[:max_span_records] / 2
       flush
     end
   end

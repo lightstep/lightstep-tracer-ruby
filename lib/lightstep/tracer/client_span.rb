@@ -106,6 +106,7 @@ class ClientSpan
 
     rec = SpanRecord.new(runtime_guid: @tracer.guid.to_s,
                          span_guid: @guid.to_s,
+                         trace_guid: @trace_guid.to_s,
                          span_name: @operation.to_s,
                          attributes: attributes,
                          oldest_micros: @start_micros.to_i,

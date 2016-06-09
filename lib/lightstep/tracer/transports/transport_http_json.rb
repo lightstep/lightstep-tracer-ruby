@@ -25,6 +25,10 @@ class TransportHTTPJSON
     @host = options[:collector_host]
     @port = options[:collector_port]
     @secure = (options[:collector_encryption] != 'none')
+
+    # Forking a worker process may kill the background thread; restart it as
+    # necessary
+    @thread = _start_network_thread unless @thread.alive?
   end
 
   def flush_report(auth, report)

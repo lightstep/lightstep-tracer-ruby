@@ -10,6 +10,6 @@ class TransportNil
     nil
   end
 
-  def close
+  def close(immediate)
   end
 end

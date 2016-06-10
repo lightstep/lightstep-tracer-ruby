@@ -6,6 +6,7 @@ build:
 test:
 	rake spec
 	ruby example.rb
+	ruby examples/fork_children/main.rb
 
 benchmark:
 	ruby benchmark/bench.rb

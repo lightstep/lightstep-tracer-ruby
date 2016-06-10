@@ -264,4 +264,10 @@ describe LightStep do
       expect(r['log_records'].length).to eq(16 * 10)
     end
   end
+
+  # NOTE: this is a relatively weak test since it is using the test transport
+  # which is very simply (rather than the actual HTTP transport and background
+  # thread).
+  it 'should support disable and enable in sequence' do
+  end
 end

@@ -11,6 +11,10 @@ class TransportHTTPJSON
     @port = 0
     @verbose = 0
     @secure = true
+
+    @thread = nil
+    @thread_pid = 0 # process ID that created the thread
+    @queue = nil
   end
 
   def ensure_connection(options)
@@ -18,12 +22,6 @@ class TransportHTTPJSON
     @host = options[:collector_host]
     @port = options[:collector_port]
     @secure = (options[:collector_encryption] != 'none')
-
-    # Network requests occur off the calling thread
-    # Note: this is a rather minimal approach to getting reporting tasks off the
-    # calling thread. If the network thread falls behind by > the queue size,
-    # it will start slowing down the calling thread.
-    @thread = _start_network_thread if @thread.nil?
   end
 
   def flush_report(auth, report)
@@ -33,10 +31,18 @@ class TransportHTTPJSON
     end
     puts report.inspect if @verbose >= 3
 
+    _check_process_id
+
+    # Lazily re-create the queue and thread. Closing the transport as well as
+    # a process fork may have reset it to nil.
+    if @thread.nil? || !@thread.alive?
+      @thread_pid = Process.pid
+      @thread = _start_network_thread
+    end
+    @queue = SizedQueue.new(16) if @queue.nil?
+
     content = _thrift_struct_to_object(report)
     # content = Zlib::deflate(content)
-
-    @queue = SizedQueue.new(16) if @queue.nil?
     @queue << {
       host: @host,
       port: @port,
@@ -48,15 +54,27 @@ class TransportHTTPJSON
     nil
   end
 
+  # Process.fork can leave SizedQueue and thread in a untrustworthy state. If the
+  # process ID has changed, reset the the thread and queue.
+  def _check_process_id
+    if Process.pid != @thread_pid
+      Thread.kill(@thread) unless @thread.nil?
+      @thread = nil
+      @queue = nil
+    end
+  end
+
   def close(discardPending)
     return if @queue.nil?
     return if @thread.nil?
 
+    _check_process_id
+
     # Since close can be called at shutdown and there are multiple Ruby
     # interpreters out there, don't assume the shutdown process will leave the
     # thread alive or have definitely killed it
-    if @thread.alive?
-      @queue << { signal_exit: true }
+    if !@thread.nil? && @thread.alive?
+      @queue << { signal_exit: true } unless @queue.nil?
       @thread.join
     elsif !@queue.empty? && !discardPending
       begin

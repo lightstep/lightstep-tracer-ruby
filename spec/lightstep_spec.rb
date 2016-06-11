@@ -269,5 +269,18 @@ describe LightStep do
   # which is very simply (rather than the actual HTTP transport and background
   # thread).
   it 'should support disable and enable in sequence' do
+    tracer = init_callback_tracer(proc { |obj|; result = obj; })
+    for i in 1..4
+      tracer.disable
+      tracer.enable
+    end
+
+    tracer.disable
+    tracer.disable
+    tracer.disable
+
+    tracer.enable
+    tracer.enable
+    tracer.enable
   end
 end

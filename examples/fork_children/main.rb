@@ -34,7 +34,21 @@ for k in 1..20
     span.finish
   end
 
+  # Make sure redundant enable calls don't cause problems
+  for i in 1..10
+    LightStep.disable
+    LightStep.enable
+    LightStep.disable
+    LightStep.disable
+    LightStep.enable
+    LightStep.enable
+    span = LightStep.start_span("my_toggle_span-#{Process.pid}")
+    sleep(0.0025 * rand(k))
+    span.finish
+  end
+
   puts "Parent, pid #{Process.pid}, waiting on child pid #{pid}"
   Process.wait
 end
+
 puts 'Exiting'

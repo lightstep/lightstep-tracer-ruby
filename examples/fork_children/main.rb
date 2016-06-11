@@ -9,20 +9,17 @@ LightStep.init_global_tracer('lightstep/ruby/examples/fork_children', '{your_acc
 
 puts 'Starting...'
 for k in 1..20
-  puts "Iteration #{k}..."
+  puts "Explicit reset iteration #{k}..."
 
-  # NOTE: the tracer is disabled and reenalbed on either side of the fork
+  # NOTE: the tracer is disabled and reenabled on either side of the fork
   LightStep.disable
   pid = Process.fork do
     LightStep.enable
-
-    puts "Child, pid #{Process.pid}"
     for i in 1..10
       span = LightStep.start_span("my_forked_span-#{Process.pid}")
       sleep(0.0025 * rand(k))
       span.finish
     end
-    puts 'Child done'
   end
 
   # Also renable the parent process' tracer
@@ -51,4 +48,24 @@ for k in 1..20
   Process.wait
 end
 
-puts 'Exiting'
+# Repeat the test, this time relying on the library to internally detect the fork
+# and reset the reporting state as needed.
+for k in 1..20
+  puts "Implicit reset iteration #{k}..."
+
+  pid = Process.fork do
+    for i in 1..10
+      span = LightStep.start_span("second_forked_span-#{Process.pid}")
+      span.finish
+    end
+  end
+  for i in 1..10
+    span = LightStep.start_span("second_process_span-#{Process.pid}")
+    span.finish
+  end
+
+  puts "Parent, pid #{Process.pid}, waiting on child pid #{pid}"
+  Process.wait
+end
+
+puts 'Done!'

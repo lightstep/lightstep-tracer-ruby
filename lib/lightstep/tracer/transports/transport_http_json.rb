@@ -11,13 +11,6 @@ class TransportHTTPJSON
     @port = 0
     @verbose = 0
     @secure = true
-
-    # Network requests occur off the calling thread
-    # Note: this is a rather minimal approach to getting reporting tasks off the
-    # calling thread. If the network thread falls behind by > the queue size,
-    # it will start slowing down the calling thread.
-    @queue = SizedQueue.new(16)
-    @thread = _start_network_thread
   end
 
   def ensure_connection(options)
@@ -25,6 +18,12 @@ class TransportHTTPJSON
     @host = options[:collector_host]
     @port = options[:collector_port]
     @secure = (options[:collector_encryption] != 'none')
+
+    # Network requests occur off the calling thread
+    # Note: this is a rather minimal approach to getting reporting tasks off the
+    # calling thread. If the network thread falls behind by > the queue size,
+    # it will start slowing down the calling thread.
+    @thread = _start_network_thread if @thread.nil?
   end
 
   def flush_report(auth, report)
@@ -37,6 +36,7 @@ class TransportHTTPJSON
     content = _thrift_struct_to_object(report)
     # content = Zlib::deflate(content)
 
+    @queue = SizedQueue.new(16) if @queue.nil?
     @queue << {
       host: @host,
       port: @port,
@@ -48,14 +48,17 @@ class TransportHTTPJSON
     nil
   end
 
-  def close
+  def close(discardPending)
+    return if @queue.nil?
+    return if @thread.nil?
+
     # Since close can be called at shutdown and there are multiple Ruby
     # interpreters out there, don't assume the shutdown process will leave the
     # thread alive or have definitely killed it
     if @thread.alive?
       @queue << { signal_exit: true }
       @thread.join
-    elsif !@queue.empty?
+    elsif !@queue.empty? && !discardPending
       begin
         _post_report(@queue.pop(true))
       rescue
@@ -63,6 +66,11 @@ class TransportHTTPJSON
         # exception back into the calling code.
       end
     end
+
+    # Clear the member variables so the transport is in a known state and can be
+    # restarted safely
+    @queue = nil
+    @thread = nil
   end
 
   def _start_network_thread

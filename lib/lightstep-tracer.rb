@@ -56,6 +56,19 @@ module LightStep
     instance.start_span(operation_name, fields)
   end
 
+  # Moves the tracer into a disabled state: the reporting loop is immediately
+  # stopped and spans finished or started in the disabled state will not be
+  # reported.
+  def self.disable
+    instance.disable
+  end
+
+  # Reenables the tracer after a call to disable. This recreates the reporting
+  # thread and it is again valid to start and finish new spans.
+  def self.enable
+    instance.enable
+  end
+
   def self.flush
     instance.flush
    end

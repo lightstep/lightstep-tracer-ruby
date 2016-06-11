@@ -16,6 +16,6 @@ class TransportCallback
     nil
   end
 
-  def close
+  def close(immediate)
   end
 end

@@ -124,7 +124,7 @@ class ClientTracer
     # (which in turn will send the flushed data over the network).
     at_exit do
       flush
-      @tracer_transport.close
+      @tracer_transport.close(false)
     end
   end
 
@@ -191,14 +191,20 @@ class ClientTracer
     @tracer_options[:access_token]
   end
 
-  def disable
-    discard
+  # Reenables the tracer.
+  def enable
+    @tracer_enabled = true
+  end
+
+  # Disables the tracer.  If 'discardPending' is true, any queue tracing data is
+  # discarded; otherwise, any queued data is flushed before the tracer is
+  # disabled.
+  def disable(discardPending = false)
     @tracer_enabled = false
+    @tracer_transport.close(discardPending)
   end
 
   def flush
-    # TODO: the outer method has been split from the worker to eventually
-    # support a background reporting Thread.
     _flush_worker
   end
 
@@ -270,6 +276,7 @@ class ClientTracer
   # Internal use only.
   def _finish_span(span)
     return unless @tracer_enabled
+
     span.set_end_micros(@tracer_utils.now_micros)
     full = push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
     @tracer_counters[:dropped_spans] += 1 if full

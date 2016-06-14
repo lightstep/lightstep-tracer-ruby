@@ -283,7 +283,7 @@ class ClientTracer
     flush_if_needed
   end
 
-  def raw_log_record(fields, _payload)
+  def raw_log_record(fields, payload)
     return unless @tracer_enabled
 
     fields[:runtime_guid] = @tracer_guid.to_s
@@ -294,12 +294,17 @@ class ClientTracer
 
     # TODO: data scrubbing and size limiting
     json = nil
-    if _payload.is_a?(Array) || _payload.is_a?(Hash)
-      json = JSON.generate(_payload)
-    elsif !_payload.nil?
+    if payload.is_a?(Array) || payload.is_a?(Hash)
+      begin
+        json = JSON.generate(payload, max_nesting: 8)
+      rescue
+        # TODO: failure to encode a payload as JSON should be recorded in the
+        # internal library logs, with catioun not flooding the internal logs.
+      end
+    elsif !payload.nil?
       # TODO: Remove the outer 'payload' key wrapper. Just transport the JSON
       # Value (Value in the sense of the JSON spec).
-      json = JSON.generate(payload: _payload)
+      json = JSON.generate(payload: payload)
     end
     fields[:payload_json] = json if json.class.name == 'String'
 

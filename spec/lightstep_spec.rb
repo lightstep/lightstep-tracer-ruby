@@ -101,6 +101,7 @@ describe LightStep do
   it 'should handle all valid payloads types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
+    file = File.open('./lib/lightstep-tracer.rb', 'r')
     data = [
       nil,
       TRUE, FALSE,
@@ -114,11 +115,29 @@ describe LightStep do
       0..1000,
       {},
       { a: 'apple', b: 'bagel' },
-      { outer: { in: 'ner' } }
+      { outer: { in: 'ner' } },
+      STDOUT,
+      STDERR,
+      STDIN,
+      file,
+      nil::NilClass
     ]
     data.each do |value|
       span.log_event 'test', value
     end
+    span.finish
+    file.close
+  end
+
+  it 'should handle payloads with circular references' do
+    a = { value: 7, next: nil }
+    b = { value: 42, next: nil }
+    a['next'] = b
+    b['next'] = a
+
+    tracer = init_test_tracer
+    span = tracer.start_span('test_span')
+    span.log_event 'circular_ref', a
     span.finish
   end
 

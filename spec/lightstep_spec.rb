@@ -84,6 +84,14 @@ describe LightStep do
     expect(span3.end_micros).to eq(5678 * 1000)
   end
 
+  it 'should allow end time to be specified at finish time' do
+    tracer = init_test_tracer
+
+    span = tracer.start_span('test')
+    span.finish(endTime: 54_321)
+    expect(span.end_micros).to eq(54_321 * 1000)
+  end
+
   it 'should assign the same trace_guid to child spans as the parent' do
     tracer = init_test_tracer
     parent1 = tracer.start_span('parent1')

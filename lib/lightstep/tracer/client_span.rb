@@ -36,8 +36,12 @@ class ClientSpan
     @tracer.raw_log_record(record, fields[:payload])
   end
 
-  def finish
+  def finish(fields = nil)
+    unless fields.nil?
+      set_end_micros(fields[:endTime] * 1000) unless fields[:endTime].nil?
+    end
     @tracer._finish_span(self)
+    self
   end
 
   # ----------------------------------------------------------------------------

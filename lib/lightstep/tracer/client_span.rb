@@ -73,8 +73,8 @@ class ClientSpan
     self
   end
 
-  def set_end_micros(start)
-    @end_micros = start
+  def set_end_micros(micros)
+    @end_micros = micros
     self
   end
 

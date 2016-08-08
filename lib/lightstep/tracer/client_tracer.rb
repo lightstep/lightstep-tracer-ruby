@@ -15,6 +15,15 @@ class ClientTracer
   #  OpenTracing API
   # ----------------------------------------------------------------------------
 
+  # Starts a new span.
+  #
+  # The fields argument is optional. The accepted fields are:
+  #
+  # :parent - parent span object
+  # :tags - map of key-value pairs
+  # :startTime - manually specified start time of the span in milliseconds
+  # :endTime - manually specified end time of the span in milliseconds
+  #
   def start_span(operation_name, fields = nil)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
@@ -23,9 +32,8 @@ class ClientTracer
     unless fields.nil?
       span.set_parent(fields[:parent]) unless fields[:parent].nil?
       span.set_tags(fields[:tags]) unless fields[:tags].nil?
-      unless fields[:startTime].nil?
-        span.set_start_micros(fields[:startTime] * 1000)
-      end
+      span.set_start_micros(fields[:startTime] * 1000) unless fields[:startTime].nil?
+      span.set_end_micros(fields[:endTime] * 1000) unless fields[:endTime].nil?
     end
 
     span.trace_guid = generate_uuid_string if span.trace_guid.nil?
@@ -277,7 +285,7 @@ class ClientTracer
   def _finish_span(span)
     return unless @tracer_enabled
 
-    span.set_end_micros(@tracer_utils.now_micros)
+    span.set_end_micros(@tracer_utils.now_micros) if span.end_micros === 0
     full = push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
     @tracer_counters[:dropped_spans] += 1 if full
     flush_if_needed

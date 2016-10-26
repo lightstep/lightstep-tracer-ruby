@@ -1,6 +1,8 @@
+# FIXME(ngauthier@gmail.com) unused
 require_relative './util'
 require_relative './thrift/crouton_types'
 
+# FIXME(ngauthier@gmail.com) namespace
 class ClientSpan
   # ----------------------------------------------------------------------------
   #  OpenTracing API
@@ -8,20 +10,24 @@ class ClientSpan
 
   attr_reader :tracer
 
+  # FIXME(ngauthier@gmail.com) writer
   def set_tag(key, value)
     @tags[key] = value
     self
   end
 
+  # FIXME(ngauthier@gmail.com) accessor
   def set_baggage_item(key, value)
     @baggage[key] = value
     self
   end
 
+  # FIXME(ngauthier@gmail.com) accessor
   def get_baggage_item(key)
     @baggage[key]
   end
 
+  # FIXME(ngauthier@gmail.com) keyword arg?
   def log_event(event, payload = nil)
     log(event: event.to_s, payload: payload)
   end
@@ -36,6 +42,7 @@ class ClientSpan
     @tracer.raw_log_record(record, fields[:payload])
   end
 
+  # FIXME(ngauthier@gmail.com) keyword arg?
   def finish(fields = nil)
     unless fields.nil?
       set_end_micros(fields[:endTime] * 1000) unless fields[:endTime].nil?
@@ -72,16 +79,19 @@ class ClientSpan
     end
   end
 
+  # FIXME(ngauthier@gmail.com) writer
   def set_start_micros(start)
     @start_micros = start
     self
   end
 
+  # FIXME(ngauthier@gmail.com) writer
   def set_end_micros(micros)
     @end_micros = micros
     self
   end
 
+  # FIXME(ngauthier@gmail.com) writer
   def set_operation_name(name)
     @operation = name
     self
@@ -91,10 +101,14 @@ class ClientSpan
     @tags[:parent_span_guid]
   end
 
+  # FIXME(ngauthier@gmail.com) constant prefix
+  # FIXME(ngauthier@gmail.com) safe url generation?
+  # FIXME(ngauthier@gmail.com) getter
   def generate_trace_url
     "https://app.lightstep.com/#{@tracer.access_token}/trace?span_guid=#{@guid}&at_micros=#{start_micros}"
   end
 
+  # FIXME(ngauthier@gmail.com) writer
   def set_parent(span)
     set_tag(:parent_span_guid, span.guid)
     @trace_guid = span.trace_guid
@@ -108,6 +122,7 @@ class ClientSpan
       KeyValue.new(Key: key.to_s, Value: value.to_s)
     end
 
+    # FIXME(ngauthier@gmail.com) formatting
     rec = SpanRecord.new(runtime_guid: @tracer.guid.to_s,
                          span_guid: @guid.to_s,
                          trace_guid: @trace_guid.to_s,

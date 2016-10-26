@@ -2,8 +2,10 @@ require 'json'
 require 'zlib'
 require 'net/http'
 require 'thread'
+# FIXME(ngauthier@gmail.com) unused
 require_relative './util'
 
+# FIXME(ngauthier@gmail.com) namespace
 class TransportHTTPJSON
   def initialize
     # Configuration
@@ -56,6 +58,7 @@ class TransportHTTPJSON
 
   # Process.fork can leave SizedQueue and thread in a untrustworthy state. If the
   # process ID has changed, reset the the thread and queue.
+  # FIXME(ngauthier@gmail.com) private
   def _check_process_id
     if Process.pid != @thread_pid
       Thread.kill(@thread) unless @thread.nil?
@@ -79,6 +82,7 @@ class TransportHTTPJSON
     elsif !@queue.empty? && !discardPending
       begin
         _post_report(@queue.pop(true))
+      # FIXME(ngauthier@gmail.com) naked rescue
       rescue
         # Ignore the error. Make sure this final flush does not percollate an
         # exception back into the calling code.
@@ -91,6 +95,9 @@ class TransportHTTPJSON
     @thread = nil
   end
 
+  # FIXME(ngauthier@gmail.com) private
+  # TODO(ngauthier@gmail.com) abort on exception?
+  # FIXME(ngauthier@gmail.com) plain loop + break
   def _start_network_thread
     Thread.new do
       done = false
@@ -105,6 +112,7 @@ class TransportHTTPJSON
     end
   end
 
+  # FIXME(ngauthier@gmail.com) private
   def _post_report(params)
     https = Net::HTTP.new(params[:host], params[:port])
     https.use_ssl = params[:secure]

@@ -1,6 +1,7 @@
-
+# FIXME(ngauthier@gmail.com) unused
 require_relative './util'
 
+# FIXME(ngauthier@gmail.com) namespace
 class TransportCallback
   def initialize
     @callback = nil

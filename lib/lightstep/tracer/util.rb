@@ -1,3 +1,5 @@
+# FIXME(ngauthier@gmail.com) namespace
+# FIXME(ngauthier@gmail.com) only used in tracer, move into tracer
 class Util
   def initialize
     @rng = Random.new

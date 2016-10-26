@@ -10,6 +10,7 @@ require_relative './transports/transport_callback'
 require_relative './thrift/crouton_types'
 require_relative './version.rb'
 
+# FIXME(ngauthier@gmail.com) namespace
 class ClientTracer
   # ----------------------------------------------------------------------------
   #  OpenTracing API
@@ -163,6 +164,7 @@ class ClientTracer
     end
   end
 
+  # FIXME(ngauthier@gmail.com) private
   def _inject_to_text_map(span, carrier)
     carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
     carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_guid unless span.trace_guid.nil?
@@ -173,6 +175,7 @@ class ClientTracer
     end
   end
 
+  # FIXME(ngauthier@gmail.com) private
   def _join_from_text_map(operation_name, carrier)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
@@ -207,6 +210,7 @@ class ClientTracer
   # Disables the tracer.  If 'discardPending' is true, any queue tracing data is
   # discarded; otherwise, any queued data is flushed before the tracer is
   # disabled.
+  # FIXME(ngauthier@gmail.com) named parameter
   def disable(discardPending = false)
     @tracer_enabled = false
     @tracer_transport.close(discardPending)
@@ -216,6 +220,7 @@ class ClientTracer
     _flush_worker
   end
 
+  # FIXME(ngauthier@gmail.com) private
   def _flush_worker
     return unless @tracer_enabled
 
@@ -246,6 +251,7 @@ class ClientTracer
     thrift_counters = @tracer_counters.map do |key, value|
       NamedCounter.new(Name: key.to_s, Value: value.to_i)
     end
+    # FIXME(ngauthier@gmail.com) formatting
     report_request = ReportRequest.new(runtime: @tracer_thrift_runtime,
                                        oldest_micros: @tracer_report_start_time.to_i,
                                        youngest_micros: now.to_i,
@@ -267,6 +273,7 @@ class ClientTracer
     end
 
     # Process server response commands
+    # FIXME(ngauthier@gmail.com) triple equals
     if !resp.nil? && resp.commands.class.name == 'Array'
       resp.commands.each do |cmd|
         disable if cmd.disable
@@ -302,6 +309,8 @@ class ClientTracer
 
     # TODO: data scrubbing and size limiting
     json = nil
+    # FIXME(ngauthier@gmail.com) triple equals
+    # FIXME(ngauthier@gmail.com) can do as a type case
     if payload.is_a?(Array) || payload.is_a?(Hash)
       begin
         json = JSON.generate(payload, max_nesting: 8)
@@ -314,6 +323,7 @@ class ClientTracer
       # Value (Value in the sense of the JSON spec).
       json = JSON.generate(payload: payload)
     end
+    # FIXME(ngauthier@gmail.com) triple equal String
     fields[:payload_json] = json if json.class.name == 'String'
 
     rec = LogRecord.new(fields)
@@ -366,10 +376,12 @@ class ClientTracer
 
   def init_thrift_data_if_needed(component_name, access_token)
     # Pre-conditions
+    # FIXME(ngauthier@gmail.com) triple equals
     if access_token.class.name != 'String'
       warn 'access_token must be a string'
       exit(1)
     end
+    # FIXME(ngauthier@gmail.com) triple equals
     if component_name.class.name != 'String'
       warn 'component_name must be a string'
       exit(1)
@@ -416,6 +428,7 @@ class ClientTracer
       pair.Value = value.to_s
       thrift_attrs.push(pair)
     end
+    # FIXME(ngauthier@gmail.com) formatting and new hash style
     @tracer_thrift_runtime = Runtime.new('guid' => @tracer_guid.to_s,
                                          'start_micros' => @tracer_start_time.to_i,
                                          'group_name' => component_name.to_s,

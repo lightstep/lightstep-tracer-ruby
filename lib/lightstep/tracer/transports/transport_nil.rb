@@ -1,4 +1,5 @@
 # Empty transport, primarily for unit testing purposes
+# FIXME(ngauthier@gmail.com) namespace
 class TransportNil
   def initialize
   end

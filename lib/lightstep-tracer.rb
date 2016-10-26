@@ -14,11 +14,13 @@ module LightStep
   end
 
   def self.init_global_tracer(component_name, access_token, opts = nil)
+    # FIXME(ngauthier@gmail.com) triple equals
     if component_name.class.name != 'String' || component_name.empty?
       puts "Invalid component_name: #{component_name}"
       exit(1)
       end
 
+    # FIXME(ngauthier@gmail.com) triple equals
     if access_token.class.name != 'String' || access_token.empty?
       puts 'Invalid access_token'
       exit(1)

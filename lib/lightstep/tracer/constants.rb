@@ -1,3 +1,4 @@
+# FIXME(ngauthier@gmail.com) move into root lib file
 module Lightstep
   module Tracer
     FORMAT_TEXT_MAP = 1

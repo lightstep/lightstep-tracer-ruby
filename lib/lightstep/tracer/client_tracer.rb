@@ -25,6 +25,7 @@ class ClientTracer
   # :startTime - manually specified start time of the span in milliseconds
   # :endTime - manually specified end time of the span in milliseconds
   #
+  # TODO(ngauthier@gmail.com) take a block and finish?
   def start_span(operation_name, fields = nil)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)

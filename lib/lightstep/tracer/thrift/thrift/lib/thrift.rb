@@ -1,6 +1,11 @@
 #
 # NOTE: the code below has been modified to be the minimal subset of Thrift
 # 0.9.2 require by the LightStep tracer.
+# FIXME(ngauthier@gmail.com) by vendoring thrift like this you can encounter some
+# serious namespacing and dependency collision issues. You should either:
+# 1) Depend on the real thrift gem and patch it
+# 2) Namespace your version of thrift under the LightStep module, and possibly
+# 3) extract it to your own lightstep-thrift gem
 #
 
 #

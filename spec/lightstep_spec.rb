@@ -1,5 +1,4 @@
-require 'pp'
-require_relative '../lib/lightstep-tracer.rb'
+require 'spec_helper'
 
 # FIXME(ngauthier@gmail.com) scope leak move into describe
 def init_test_tracer

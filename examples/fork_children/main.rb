@@ -4,6 +4,7 @@
 #
 require 'bundler'
 require 'simplecov'
+SimpleCov.command_name "examples/fork_children/main.rb"
 SimpleCov.start
 require 'lightstep-tracer'
 

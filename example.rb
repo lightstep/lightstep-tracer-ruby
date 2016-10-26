@@ -1,5 +1,6 @@
 require 'bundler'
 require 'simplecov'
+SimpleCov.command_name "example.rb"
 SimpleCov.start
 require 'lightstep-tracer'
 

@@ -1,6 +1,5 @@
 require 'bundler'
 require 'lightstep-tracer'
-require 'thread'
 
 LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
 

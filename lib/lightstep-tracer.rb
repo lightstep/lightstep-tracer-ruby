@@ -1,5 +1,5 @@
-require_relative './lightstep/tracer/client_tracer'
-require_relative './lightstep/tracer/constants'
+require 'lightstep/tracer/client_tracer'
+require 'lightstep/tracer/constants'
 
 module LightStep
   @@instance = nil

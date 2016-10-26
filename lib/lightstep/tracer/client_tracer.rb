@@ -1,13 +1,13 @@
 require 'json'
 require 'weakref'
 
-require_relative './constants'
-require_relative './client_span'
-require_relative './util'
-require_relative './transports/transport_http_json'
-require_relative './transports/transport_nil'
-require_relative './transports/transport_callback'
-require_relative './version.rb'
+require 'lightstep/tracer/constants'
+require 'lightstep/tracer/client_span'
+require 'lightstep/tracer/util'
+require 'lightstep/tracer/transports/transport_http_json'
+require 'lightstep/tracer/transports/transport_nil'
+require 'lightstep/tracer/transports/transport_callback'
+require 'lightstep/tracer/version.rb'
 
 # FIXME(ngauthier@gmail.com) namespace
 class ClientTracer

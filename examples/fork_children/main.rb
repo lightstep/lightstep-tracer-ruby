@@ -6,7 +6,6 @@ require 'bundler'
 require 'simplecov'
 SimpleCov.start
 require 'lightstep-tracer'
-require 'thread'
 
 LightStep.init_global_tracer('lightstep/ruby/examples/fork_children', '{your_access_token}')
 

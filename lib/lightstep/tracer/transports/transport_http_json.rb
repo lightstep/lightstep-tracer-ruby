@@ -1,8 +1,4 @@
-require 'json'
-require 'zlib'
 require 'net/http'
-require 'thread'
-
 # FIXME(ngauthier@gmail.com) namespace
 class TransportHTTPJSON
   def initialize

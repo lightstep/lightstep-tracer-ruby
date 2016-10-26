@@ -124,7 +124,7 @@ describe LightStep do
 
     (children1.concat children2).each do |child|
       thrift_data = child.to_thrift
-      expect(thrift_data.trace_guid).to eq(child.trace_guid)
+      expect(thrift_data['trace_guid']).to eq(child.trace_guid)
     end
   end
 

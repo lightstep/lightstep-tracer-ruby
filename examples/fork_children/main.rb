@@ -2,7 +2,10 @@
 # Currently this requires the tracer instance to be explicitly disabled before the fork
 # and reenabled afterward.
 #
-require_relative '../../lib/lightstep-tracer.rb'
+require 'bundler'
+require 'simplecov'
+SimpleCov.start
+require 'lightstep-tracer'
 require 'thread'
 
 LightStep.init_global_tracer('lightstep/ruby/examples/fork_children', '{your_access_token}')

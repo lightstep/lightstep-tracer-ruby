@@ -1,4 +1,5 @@
-require_relative '../../lib/lightstep-tracer.rb'
+require 'bundler'
+require 'lightstep-tracer'
 
 require 'rack'
 require 'rack/server'

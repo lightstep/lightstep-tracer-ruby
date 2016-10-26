@@ -1,4 +1,7 @@
-require_relative './lib/lightstep-tracer.rb'
+require 'bundler'
+require 'simplecov'
+SimpleCov.start
+require 'lightstep-tracer'
 
 LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
 

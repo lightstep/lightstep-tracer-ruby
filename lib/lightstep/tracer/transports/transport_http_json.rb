@@ -2,8 +2,6 @@ require 'json'
 require 'zlib'
 require 'net/http'
 require 'thread'
-# FIXME(ngauthier@gmail.com) unused
-require_relative './util'
 
 # FIXME(ngauthier@gmail.com) namespace
 class TransportHTTPJSON
@@ -43,14 +41,12 @@ class TransportHTTPJSON
     end
     @queue = SizedQueue.new(16) if @queue.nil?
 
-    content = _thrift_struct_to_object(report)
-    # content = Zlib::deflate(content)
     @queue << {
       host: @host,
       port: @port,
       secure: @secure,
-      access_token: auth.access_token,
-      content: content,
+      access_token: auth['access_token'],
+      content: report,
       verbose: @verbose
     }
     nil

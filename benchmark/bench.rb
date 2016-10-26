@@ -1,7 +1,8 @@
 require 'benchmark'
 require 'securerandom'
 
-require_relative '../lib/lightstep-tracer.rb'
+require 'bundler'
+require 'lightstep-tracer'
 
 rng = Random.new
 

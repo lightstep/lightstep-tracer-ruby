@@ -7,7 +7,6 @@ require_relative './util'
 require_relative './transports/transport_http_json'
 require_relative './transports/transport_nil'
 require_relative './transports/transport_callback'
-require_relative './thrift/crouton_types'
 require_relative './version.rb'
 
 # FIXME(ngauthier@gmail.com) namespace
@@ -245,12 +244,12 @@ class ClientTracer
       log['runtime_guid'] = @tracer_guid
     end
     @tracer_span_records.each do |span|
-      span.runtime_guid = @tracer_guid
+      span['runtime_guid'] = @tracer_guid
     end
 
     # Convert the counters to thrift form
     thrift_counters = @tracer_counters.map do |key, value|
-      NamedCounter.new(Name: key.to_s, Value: value.to_i)
+      {"Name" => key.to_s, "Value" => value.to_i}
     end
 
     report_request = {
@@ -421,13 +420,13 @@ class ClientTracer
     # Generate the GUID on thrift initialization as the GUID should be
     # stable for a particular access token / component name combo.
     @tracer_guid = generate_uuid_string
-    @tracer_thrift_auth = Auth.new(access_token: access_token.to_s)
+    @tracer_thrift_auth = {"access_token" => access_token.to_s}
 
     @tracer_thrift_runtime = {
       'guid' => @tracer_guid.to_s,
       'start_micros' => @tracer_start_time.to_i,
       'group_name' => component_name.to_s,
-      'attrs' => runtime_attrs.map{|k,v| {"Key" => k, "Value" => v}}
+      'attrs' => runtime_attrs.map{|k,v| {"Key" => k.to_s, "Value" => v}}
     }
   end
 end

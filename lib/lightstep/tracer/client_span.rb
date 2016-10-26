@@ -1,6 +1,5 @@
 # FIXME(ngauthier@gmail.com) unused
 require_relative './util'
-require_relative './thrift/crouton_types'
 
 # FIXME(ngauthier@gmail.com) namespace
 class ClientSpan
@@ -115,21 +114,21 @@ class ClientSpan
     self
   end
 
+  # FIXME(ngauthier@gmail.com) to_h
   def to_thrift
-    # Coerce all the types to strings to ensure there are no encoding/decoding
-    # issues
     attributes = @tags.map do |key, value|
-      KeyValue.new(Key: key.to_s, Value: value.to_s)
+      {"Key" => key.to_s, "Value" => value.to_s}
     end
 
-    # FIXME(ngauthier@gmail.com) formatting
-    rec = SpanRecord.new(runtime_guid: @tracer.guid.to_s,
-                         span_guid: @guid.to_s,
-                         trace_guid: @trace_guid.to_s,
-                         span_name: @operation.to_s,
-                         attributes: attributes,
-                         oldest_micros: @start_micros.to_i,
-                         youngest_micros: @end_micros.to_i,
-                         error_flag: @error_flag)
+    rec = {
+      "runtime_guid" => @tracer.guid.to_s,
+      "span_guid" => @guid.to_s,
+      "trace_guid" => @trace_guid.to_s,
+      "span_name" => @operation.to_s,
+      "attributes" => attributes,
+      "oldest_micros" => @start_micros.to_i,
+      "youngest_micros" => @end_micros.to_i,
+      "error_flag" => @error_flag
+    }
   end
 end

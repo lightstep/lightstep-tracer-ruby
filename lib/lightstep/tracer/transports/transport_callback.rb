@@ -12,8 +12,7 @@ class TransportCallback
   end
 
   def flush_report(_auth, report)
-    content = _thrift_struct_to_object(report)
-    @callback.call(content)
+    @callback.call(report)
     nil
   end
 

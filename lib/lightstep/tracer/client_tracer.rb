@@ -242,7 +242,7 @@ class ClientTracer
     # prior to setting those values.  Any such 'early buffered' spans need
     # to have the GUID set; for simplicity, the code resets them all.
     @tracer_log_records.each do |log|
-      log.runtime_guid = @tracer_guid
+      log['runtime_guid'] = @tracer_guid
     end
     @tracer_span_records.each do |span|
       span.runtime_guid = @tracer_guid
@@ -252,13 +252,15 @@ class ClientTracer
     thrift_counters = @tracer_counters.map do |key, value|
       NamedCounter.new(Name: key.to_s, Value: value.to_i)
     end
-    # FIXME(ngauthier@gmail.com) formatting
-    report_request = ReportRequest.new(runtime: @tracer_thrift_runtime,
-                                       oldest_micros: @tracer_report_start_time.to_i,
-                                       youngest_micros: now.to_i,
-                                       log_records: @tracer_log_records,
-                                       span_records: @tracer_span_records,
-                                       counters: thrift_counters)
+
+    report_request = {
+      'runtime' => @tracer_thrift_runtime,
+      'oldest_micros' => @tracer_report_start_time.to_i,
+      'youngest_micros' => now.to_i,
+      'log_records' => @tracer_log_records,
+      'span_records' => @tracer_span_records,
+      'counters' => thrift_counters
+    }
 
     @tracer_last_flush_micros = now
 
@@ -302,10 +304,10 @@ class ClientTracer
   def raw_log_record(fields, payload)
     return unless @tracer_enabled
 
-    fields[:runtime_guid] = @tracer_guid.to_s
+    fields['runtime_guid'] = @tracer_guid.to_s
 
-    if fields[:timestamp_micros].nil?
-      fields[:timestamp_micros] = @tracer_utils.now_micros.to_i
+    if fields['timestamp_micros'].nil?
+      fields['timestamp_micros'] = @tracer_utils.now_micros.to_i
     end
 
     # TODO: data scrubbing and size limiting
@@ -325,10 +327,9 @@ class ClientTracer
       json = JSON.generate(payload: payload)
     end
     # FIXME(ngauthier@gmail.com) triple equal String
-    fields[:payload_json] = json if json.class.name == 'String'
+    fields['payload_json'] = json if json.class.name == 'String'
 
-    rec = LogRecord.new(fields)
-    full = push_with_max(@tracer_log_records, rec, @tracer_options[:max_log_records])
+    full = push_with_max(@tracer_log_records, fields, @tracer_options[:max_log_records])
     @tracer_counters[:dropped_logs] += 1 if full
   end
 
@@ -412,9 +413,9 @@ class ClientTracer
 
     # Tracer attributes
     runtime_attrs = {
-      lightstep_tracer_platform: 'ruby',
-      lightstep_tracer_version: Lightstep::Tracer::VERSION,
-      ruby_version: RUBY_VERSION
+      "lightstep_tracer_platform" => 'ruby',
+      "lightstep_tracer_version" => Lightstep::Tracer::VERSION,
+      "ruby_version" => RUBY_VERSION
     }
 
     # Generate the GUID on thrift initialization as the GUID should be
@@ -422,17 +423,11 @@ class ClientTracer
     @tracer_guid = generate_uuid_string
     @tracer_thrift_auth = Auth.new(access_token: access_token.to_s)
 
-    thrift_attrs = []
-    runtime_attrs.each do |key, value|
-      pair = KeyValue.new
-      pair.Key = key.to_s
-      pair.Value = value.to_s
-      thrift_attrs.push(pair)
-    end
-    # FIXME(ngauthier@gmail.com) formatting and new hash style
-    @tracer_thrift_runtime = Runtime.new('guid' => @tracer_guid.to_s,
-                                         'start_micros' => @tracer_start_time.to_i,
-                                         'group_name' => component_name.to_s,
-                                         'attrs' => thrift_attrs)
+    @tracer_thrift_runtime = {
+      'guid' => @tracer_guid.to_s,
+      'start_micros' => @tracer_start_time.to_i,
+      'group_name' => component_name.to_s,
+      'attrs' => runtime_attrs.map{|k,v| {"Key" => k, "Value" => v}}
+    }
   end
 end

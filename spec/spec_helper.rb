@@ -17,6 +17,7 @@
 
 require 'simplecov'
 SimpleCov.start
+require 'pp'
 require 'lightstep-tracer'
 
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration

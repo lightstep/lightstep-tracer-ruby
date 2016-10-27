@@ -20,6 +20,21 @@ module LightStep
     attr_accessor :verbose
 
     # ----------------------------------------------------------------------------
+    # Implemenation specific
+    # ----------------------------------------------------------------------------
+
+    # TODO(ngauthier@gmail.com) document all options, convert to keyword args
+    # Creates a new tracer instance.
+    #
+    # @param $component_name Component name to use for the tracer
+    # @param $access_token The project access token
+    # @return LightStepBase_Tracer
+    # @throws Exception if the group name or access token is not a valid string.
+    def initialize(options = {})
+      configure(options)
+    end
+
+    # ----------------------------------------------------------------------------
     #  OpenTracing API
     # ----------------------------------------------------------------------------
 
@@ -78,20 +93,6 @@ module LightStep
       end
     end
 
-    # ----------------------------------------------------------------------------
-    # Implemenation specific
-    # ----------------------------------------------------------------------------
-
-    # TODO(ngauthier@gmail.com) document all options, convert to keyword args
-    # Creates a new tracer instance.
-    #
-    # @param $component_name Component name to use for the tracer
-    # @param $access_token The project access token
-    # @return LightStepBase_Tracer
-    # @throws Exception if the group name or access token is not a valid string.
-    def initialize(options = {})
-      configure(options)
-    end
 
 
     # FIXME(ngauthier@gmail.com) private
@@ -125,21 +126,24 @@ module LightStep
     end
 
     def guid
-      @tracer_guid
+      @_guid ||= generate_guid
     end
 
-    # Reenables the tracer.
+    # @return true if the tracer is enabled
+    def enabled?
+      @_enabled ||= true
+    end
+
+    # Enables the tracer
     def enable
-      @tracer_enabled = true
+      @_enabled = true
     end
 
-    # Disables the tracer.  If 'discardPending' is true, any queue tracing data is
-    # discarded; otherwise, any queued data is flushed before the tracer is
-    # disabled.
-    # FIXME(ngauthier@gmail.com) named parameter
-    def disable(discardPending = false)
-      @tracer_enabled = false
-      @tracer_transport.close(discardPending)
+    # Disables the tracer
+    # @param discard [Boolean] whether to discard queued data
+    def disable(discard: false)
+      @_enabled = false
+      @tracer_transport.close(discard)
     end
 
     def flush
@@ -148,7 +152,7 @@ module LightStep
 
     # FIXME(ngauthier@gmail.com) private
     def _flush_worker
-      return unless @tracer_enabled
+      return unless enabled?
 
       now = now_micros
 
@@ -157,19 +161,6 @@ module LightStep
       return if @tracer_thrift_runtime.nil?
 
       return if @tracer_log_records.empty? && @tracer_span_records.empty?
-
-      # Ensure the log / span GUIDs are set correctly. This is covers a real
-      # case: the runtime GUID cannot be generated until the access token
-      # and group name are set (so that is the same GUID between script
-      # invocations), but the library allows logs and spans to be buffered
-      # prior to setting those values.  Any such 'early buffered' spans need
-      # to have the GUID set; for simplicity, the code resets them all.
-      @tracer_log_records.each do |log|
-        log['runtime_guid'] = @tracer_guid
-      end
-      @tracer_span_records.each do |span|
-        span['runtime_guid'] = @tracer_guid
-      end
 
       # Convert the counters to thrift form
       thrift_counters = @tracer_counters.map do |key, value|
@@ -209,7 +200,7 @@ module LightStep
 
     # Internal use only.
     def _finish_span(span)
-      return unless @tracer_enabled
+      return unless enabled?
 
       span.set_end_micros(now_micros) if span.end_micros === 0
       full = push_with_max(@tracer_span_records, span.to_thrift, max_span_records)
@@ -218,9 +209,9 @@ module LightStep
     end
 
     def raw_log_record(fields, payload)
-      return unless @tracer_enabled
+      return unless enabled?
 
-      fields['runtime_guid'] = @tracer_guid.to_s
+      fields['runtime_guid'] = guid
 
       if fields['timestamp_micros'].nil?
         fields['timestamp_micros'] = now_micros
@@ -252,107 +243,108 @@ module LightStep
     # Returns a random guid. Note: this intentionally does not use SecureRandom,
     # which is slower and cryptographically secure randomness is not required here.
     def generate_guid
-      @rng.bytes(8).unpack('H*')[0]
+      @_rng ||= Random.new
+      @_rng.bytes(8).unpack('H*')[0]
     end
 
     protected
     attr_accessor :max_log_records, :max_span_records
     attr_writer :access_token
 
-    def configure(options = {})
-      raise ConfigurationError, "component_name must be a string" unless String === options[:component_name]
-      raise ConfigurationError, "component_name cannot be blank"  if options[:component_name].empty?
+    def configure(
+      component_name:,
+      access_token:,
+      collector_host: 'collector.lightstep.com',
+      collector_port: nil,
+      collector_secure: true,
+      collector_encryption: 'tls',
+      transport: 'http_json',
+      transport_callback: nil,
+      max_log_records: 1000,
+      max_span_records: 1000,
+      min_reporting_period_secs: 1.5,
+      max_reporting_period_secs: 30.0,
 
-      raise ConfigurationError, "access_token must be a string" unless String === options[:access_token]
-      raise ConfigurationError, "access_token cannot be blank"  if options[:access_token].empty?
+      # Internal debugging flag that enables additional logging and
+      # tracer checks. Not intended to run in production as it may add
+      # logging "noise" to the calling code.
+      verbose: 0
+    )
+      raise ConfigurationError, "component_name must be a string" unless String === component_name
+      raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      @rng = Random.new
-      @tracer_enabled = true
-      @tracer_guid = ''
-      @tracer_start_time = now_micros
-      @tracer_thrift_auth = nil
-      @tracer_thrift_runtime = nil
-      @tracer_transport = nil
-      @tracer_report_start_time = 0
+      raise ConfigurationError, "access_token must be a string" unless String === access_token
+      raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
+
       @tracer_log_records = []
       @tracer_span_records = []
       @tracer_counters = {
         dropped_logs: 0,
         dropped_spans: 0
       }
-      @tracer_last_flush_micros = 0
-      @tracer_min_flush_period_micros = 0 # Initialized below by the default options
-      @tracer_max_flush_period_micros = 0 # Initialized below by the default options
 
-      defaults = {
-        collector_host: 'collector.lightstep.com',
-        collector_port: 443,
-        collector_encryption: 'tls',
-        transport: 'http_json',
-        max_log_records: 1000,
-        max_span_records: 1000,
-        min_reporting_period_secs: 1.5,
-        max_reporting_period_secs: 30.0,
+      collector_port ||= collector_secure ? 443 : 80
 
-        max_payload_depth: 10,
+      self.verbose = verbose
+      self.access_token = access_token
 
-        # Internal debugging flag that enables additional logging and
-        # tracer checks. Not intended to run in production as it may add
-        # logging "noise" to the calling code.
-        verbose: 0
+      start_time = now_micros.to_i
+      @tracer_thrift_auth = {"access_token" => access_token}
+      @tracer_thrift_runtime = {
+        'guid' => guid,
+        'start_micros' => start_time,
+        'group_name' => component_name,
+        'attrs' => [
+          {"Key" => "lightstep_tracer_platform", "Value" => "ruby"},
+          {"Key" => "lightstep_tracer_version",  "Value" => LightStep::Tracer::VERSION},
+          {"Key" => "ruby_version",              "Value" => RUBY_VERSION}
+        ]
       }
 
-      # Modify some of the interdependent defaults based on what the user-specified
-      if !options[:collector_secure].nil?
-        options[:collector_port] ||= options[:collector_secure] ? 443 : 80
+      @tracer_min_flush_period_micros = 0
+      unless min_reporting_period_secs.nil?
+        @tracer_min_flush_period_micros = min_reporting_period_secs * 1E6
       end
 
-      # Set the options, merged with the defaults
-      options = defaults.merge(options)
-
-      self.verbose = options[:verbose]
-
-      # Deferred group name / access token initialization is supported (i.e.
-      # it is possible to create logs/spans before setting this info).
-      if !options[:access_token].nil? && !options[:component_name].nil?
-        init_thrift_data_if_needed(options[:component_name], options[:access_token])
-      end
-
-      unless options[:min_reporting_period_secs].nil?
-        @tracer_min_flush_period_micros = options[:min_reporting_period_secs] * 1E6
-      end
-      unless options[:max_reporting_period_secs]
-        @tracer_max_flush_period_micros = options[:max_reporting_period_secs] * 1E6
+      @tracer_max_flush_period_micros = 0
+      unless max_reporting_period_secs
+        @tracer_max_flush_period_micros = max_reporting_period_secs * 1E6
       end
 
       # Coerce invalid options into stable values
-      unless options[:max_log_records] > 0
-        options[:max_log_records] = 1
+      unless max_log_records > 0
+        max_log_records = 1
         debug_record_error('Invalid value for max_log_records')
       end
       # TODO(ngauthier@gmail.com) move validation into setter
-      self.max_log_records = options[:max_log_records]
+      self.max_log_records = max_log_records
 
-      unless options[:max_span_records] > 0
-        options[:max_span_records] = 1
+      unless max_span_records > 0
+        max_span_records = 1
         debug_record_error('Invalid value for max_span_records')
       end
       # TODO(ngauthier@gmail.com) move validation into setter
-      self.max_span_records = options[:max_span_records]
+      self.max_span_records = max_span_records
 
-      @tracer_transport = if options[:transport] == 'nil'
-                            Transport::Nil.new
-                          elsif options[:transport] == 'callback'
-                            Transport::Callback.new(callback: options[:transport_callback])
-                          else
-                            Transport::HTTPJSON.new(host: options[:collector_host], port: options[:collector_port], verbose: verbose, secure: options[:collector_encryption] != 'none')
-                          end
+      @tracer_transport = nil
+      case transport
+      when 'nil'
+        @tracer_transport = Transport::Nil.new
+      when 'callback'
+        @tracer_transport = Transport::Callback.new(callback: transport_callback)
+      when 'http_json'
+        @tracer_transport = Transport::HTTPJSON.new(
+          host: collector_host,
+          port: collector_port,
+          verbose: verbose,
+          secure: collector_encryption != 'none'
+        )
+      else
+        raise ConfigurationError, "unknown transport #{transport}"
+      end
 
-      # Note: the GUID is not generated until the library is initialized
-      # as it depends on the access token
-      @tracer_start_time = now_micros
-      @tracer_report_start_time = @tracer_start_time
-      @tracer_last_flush_micros = @tracer_start_time
+      @tracer_report_start_time = start_time
+      @tracer_last_flush_micros = start_time
 
       # At exit, flush this objects data to the transport and close the transport
       # (which in turn will send the flushed data over the network).
@@ -386,7 +378,7 @@ module LightStep
     end
 
     def flush_if_needed
-      return unless @tracer_enabled
+      return unless enabled?
 
       now = now_micros
       delta = now - @tracer_last_flush_micros
@@ -404,59 +396,6 @@ module LightStep
     end
 
     def init_thrift_data_if_needed(component_name, access_token)
-      # Pre-conditions
-      # FIXME(ngauthier@gmail.com) triple equals
-      if access_token.class.name != 'String'
-        warn 'access_token must be a string'
-        exit(1)
-      end
-      # FIXME(ngauthier@gmail.com) triple equals
-      if component_name.class.name != 'String'
-        warn 'component_name must be a string'
-        exit(1)
-      end
-      if access_token.empty?
-        warn 'access_token must be non-zero in length'
-        exit(1)
-      end
-      if component_name.empty?
-        warn 'component_name must be non-zero in length'
-        exit(1)
-      end
-
-      # Potentially redundant initialization info: only complain if
-      # it is inconsistent.
-      if !@tracer_thrift_auth.nil? || !@tracer_thrift_runtime.nil?
-        if @tracer_thrift_auth.access_token != access_token
-          warn 'access_token cannot be changed after it is set'
-          exit(1)
-          end
-        if @tracer_thrift_runtime.group_name != component_name
-          warn 'component name cannot be changed after it is set'
-          exit(1)
-        end
-        return
-      end
-
-      # Tracer attributes
-      runtime_attrs = {
-        "lightstep_tracer_platform" => 'ruby',
-        "lightstep_tracer_version" => LightStep::Tracer::VERSION,
-        "ruby_version" => RUBY_VERSION
-      }
-
-      # Generate the GUID on thrift initialization as the GUID should be
-      # stable for a particular access token / component name combo.
-      @tracer_guid = generate_guid
-      @tracer_thrift_auth = {"access_token" => access_token.to_s}
-      self.access_token = access_token.to_s
-
-      @tracer_thrift_runtime = {
-        'guid' => @tracer_guid.to_s,
-        'start_micros' => @tracer_start_time.to_i,
-        'group_name' => component_name.to_s,
-        'attrs' => runtime_attrs.map{|k,v| {"Key" => k.to_s, "Value" => v}}
-      }
     end
 
     def now_micros

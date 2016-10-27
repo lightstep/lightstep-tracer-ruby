@@ -1,6 +1,6 @@
 require 'json'
 
-require 'lightstep/tracer/client_span'
+require 'lightstep/tracer/span'
 require 'lightstep/tracer/transports/transport_http_json'
 require 'lightstep/tracer/transports/transport_nil'
 require 'lightstep/tracer/transports/transport_callback'

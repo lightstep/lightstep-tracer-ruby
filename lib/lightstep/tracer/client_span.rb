@@ -66,7 +66,7 @@ class ClientSpan
     @error_flag = false
 
     @tracer = tracer
-    @guid = tracer.generate_uuid_string
+    @guid = tracer.generate_guid
   end
 
   attr_reader :guid, :operation, :tags, :baggage, :start_micros, :end_micros, :error_flag

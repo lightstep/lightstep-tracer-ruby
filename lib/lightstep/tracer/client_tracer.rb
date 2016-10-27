@@ -3,7 +3,6 @@ require 'weakref'
 
 require 'lightstep/tracer/constants'
 require 'lightstep/tracer/client_span'
-require 'lightstep/tracer/util'
 require 'lightstep/tracer/transports/transport_http_json'
 require 'lightstep/tracer/transports/transport_nil'
 require 'lightstep/tracer/transports/transport_callback'
@@ -33,7 +32,7 @@ class ClientTracer
   def start_span(operation_name, fields = nil)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
-    span.set_start_micros(@tracer_utils.now_micros)
+    span.set_start_micros(now_micros)
 
     unless fields.nil?
       span.set_parent(fields[:parent]) unless fields[:parent].nil?
@@ -42,7 +41,7 @@ class ClientTracer
       span.set_end_micros(fields[:endTime] * 1000) unless fields[:endTime].nil?
     end
 
-    span.trace_guid = generate_uuid_string if span.trace_guid.nil?
+    span.trace_guid = generate_guid if span.trace_guid.nil?
     span
   end
 
@@ -75,11 +74,11 @@ class ClientTracer
   # ----------------------------------------------------------------------------
 
   def initialize(options = {})
-    @tracer_utils = Util.new
+    @rng = Random.new
     @tracer_options = {}
     @tracer_enabled = true
     @tracer_guid = ''
-    @tracer_start_time = @tracer_utils.now_micros
+    @tracer_start_time = now_micros
     @tracer_thrift_auth = nil
     @tracer_thrift_runtime = nil
     @tracer_transport = nil
@@ -130,7 +129,7 @@ class ClientTracer
 
     # Note: the GUID is not generated until the library is initialized
     # as it depends on the access token
-    @tracer_start_time = @tracer_utils.now_micros
+    @tracer_start_time = now_micros
     @tracer_report_start_time = @tracer_start_time
     @tracer_last_flush_micros = @tracer_start_time
 
@@ -184,7 +183,7 @@ class ClientTracer
   def _join_from_text_map(operation_name, carrier)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)
-    span.set_start_micros(@tracer_utils.now_micros)
+    span.set_start_micros(now_micros)
 
     parent_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid']
     trace_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid']
@@ -229,7 +228,7 @@ class ClientTracer
   def _flush_worker
     return unless @tracer_enabled
 
-    now = @tracer_utils.now_micros
+    now = now_micros
 
     # The thrift configuration has not yet been set: allow logs and spans
     # to be buffered in this case, but flushes won't yet be possible.
@@ -289,17 +288,10 @@ class ClientTracer
   end
 
   # Internal use only.
-  #
-  # Generates a random ID (not a *true* UUID).
-  def generate_uuid_string
-    @tracer_utils.generate_guid
-  end
-
-  # Internal use only.
   def _finish_span(span)
     return unless @tracer_enabled
 
-    span.set_end_micros(@tracer_utils.now_micros) if span.end_micros === 0
+    span.set_end_micros(now_micros) if span.end_micros === 0
     full = push_with_max(@tracer_span_records, span.to_thrift, @tracer_options[:max_span_records])
     @tracer_counters[:dropped_spans] += 1 if full
     flush_if_needed
@@ -311,7 +303,7 @@ class ClientTracer
     fields['runtime_guid'] = @tracer_guid.to_s
 
     if fields['timestamp_micros'].nil?
-      fields['timestamp_micros'] = @tracer_utils.now_micros.to_i
+      fields['timestamp_micros'] = now_micros
     end
 
     # TODO: data scrubbing and size limiting
@@ -335,6 +327,12 @@ class ClientTracer
 
     full = push_with_max(@tracer_log_records, fields, @tracer_options[:max_log_records])
     @tracer_counters[:dropped_logs] += 1 if full
+  end
+
+  # Returns a random guid. Note: this intentionally does not use SecureRandom,
+  # which is slower and cryptographically secure randomness is not required here.
+  def generate_guid
+    @rng.bytes(8).unpack('H*')[0]
   end
 
   protected
@@ -365,7 +363,7 @@ class ClientTracer
   def flush_if_needed
     return unless @tracer_enabled
 
-    now = @tracer_utils.now_micros
+    now = now_micros
     delta = now - @tracer_last_flush_micros
 
     # Set a bound on maximum flush frequency
@@ -424,7 +422,7 @@ class ClientTracer
 
     # Generate the GUID on thrift initialization as the GUID should be
     # stable for a particular access token / component name combo.
-    @tracer_guid = generate_uuid_string
+    @tracer_guid = generate_guid
     @tracer_thrift_auth = {"access_token" => access_token.to_s}
 
     @tracer_thrift_runtime = {
@@ -433,5 +431,11 @@ class ClientTracer
       'group_name' => component_name.to_s,
       'attrs' => runtime_attrs.map{|k,v| {"Key" => k.to_s, "Value" => v}}
     }
+  end
+
+  private
+
+  def now_micros
+    (Time.now.to_f * 1e6).floor.to_i
   end
 end

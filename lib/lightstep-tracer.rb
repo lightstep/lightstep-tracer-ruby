@@ -2,6 +2,7 @@ require 'lightstep/tracer/client_tracer'
 require 'lightstep/tracer/constants'
 
 module LightStep
+  # TODO(ngauthier@gmail.com) singleton?
   @@instance = nil
 
   def self.FORMAT_TEXT_MAP

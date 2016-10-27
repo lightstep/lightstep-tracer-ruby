@@ -1,3 +1,5 @@
+# TODO(ngauthier@gmail.com) Separate Span and SpanContext under a getter according
+# to the spec. Baggage moves to span context.
 # FIXME(ngauthier@gmail.com) namespace
 class ClientSpan
   # ----------------------------------------------------------------------------
@@ -6,7 +8,8 @@ class ClientSpan
 
   attr_reader :tracer
 
-  # FIXME(ngauthier@gmail.com) writer
+  # TODO(ngauthier@gmail.com) validate value is string, bool, or number and
+  # remove value.to_s from all calling code
   def set_tag(key, value)
     @tags[key] = value
     self
@@ -19,11 +22,12 @@ class ClientSpan
   end
 
   # FIXME(ngauthier@gmail.com) accessor
+  # TODO(ngauthier@gmail.com) remove? Not in spec to get baggage.
   def get_baggage_item(key)
     @baggage[key]
   end
 
-  # FIXME(ngauthier@gmail.com) keyword arg?
+  # TODO(ngauthier@gmail.com) remove, since it's deprecated
   def log_event(event, payload = nil)
     log(event: event.to_s, payload: payload)
   end

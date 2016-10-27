@@ -24,7 +24,12 @@ class ClientTracer
   # :startTime - manually specified start time of the span in milliseconds
   # :endTime - manually specified end time of the span in milliseconds
   #
-  # TODO(ngauthier@gmail.com) take a block and finish?
+  # TODO(ngauthier@gmail.com) parent should be child_of according to spec
+  # TODO(ngauthier@gmail.com) support follows_from?
+  # TODO(ngauthier@gmail.com) follows_from and child_of should be `references`
+  # TODO(ngauthier@gmail.com) inherit SpanContext from references
+  # TODO(ngauthier@gmail.com) fields should be tags
+  # TODO(ngauthier@gmail.com) ability to provide a timestamp to be used other than now
   def start_span(operation_name, fields = nil)
     span = ClientSpan.new(self)
     span.set_operation_name(operation_name)

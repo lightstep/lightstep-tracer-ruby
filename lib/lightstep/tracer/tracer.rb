@@ -13,11 +13,17 @@ module LightStep
     CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
     CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
 
+    DEFAULT_MAX_LOG_RECORDS = 1000
+    MIN_MAX_LOG_RECORDS = 1
+    DEFAULT_MAX_SPAN_RECORDS = 1000
+    MIN_MAX_SPAN_RECORDS = 1
+    DEFAULT_MIN_REPORTING_PERIOD_SECS = 1.5
+    DEFAULT_MAX_REPORTING_PERIOD_SECS = 30.0
+
     class Error < StandardError; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
     attr_reader :access_token
-    attr_accessor :verbose
 
     # ----------------------------------------------------------------------------
     # Implemenation specific
@@ -32,6 +38,38 @@ module LightStep
     # @throws Exception if the group name or access token is not a valid string.
     def initialize(options = {})
       configure(options)
+    end
+
+    def max_log_records
+      @max_log_records ||= DEFAULT_MAX_LOG_RECORDS
+    end
+
+    def max_log_records=(max)
+      @max_log_records = [MIN_MAX_LOG_RECORDS, max].max
+    end
+
+    def max_span_records
+      @max_span_records ||= DEFAULT_MAX_SPAN_RECORDS
+    end
+
+    def max_span_records=(max)
+      @max_span_records = [MIN_MAX_SPAN_RECORDS, max].max
+    end
+
+    def min_flush_period_micros
+      @min_flush_period_micros ||= DEFAULT_MIN_REPORTING_PERIOD_SECS * 1E6
+    end
+
+    def min_reporting_period_secs=(secs)
+      @min_flush_period_micros = [DEFAULT_MIN_REPORTING_PERIOD_SECS, secs].max * 1E6
+    end
+
+    def max_flush_period_micros
+      @max_flush_period_micros ||= DEFAULT_MAX_REPORTING_PERIOD_SECS * 1E6
+    end
+
+    def max_reporting_period_secs=(secs)
+      @max_flush_period_micros = [DEFAULT_MAX_REPORTING_PERIOD_SECS, secs].min * 1E6
     end
 
     # ----------------------------------------------------------------------------
@@ -248,8 +286,13 @@ module LightStep
     end
 
     protected
-    attr_accessor :max_log_records, :max_span_records
-    attr_writer :access_token
+
+    def access_token=(token)
+      if !access_token.nil?
+        raise ConfigurationError, "access token cannot be changed"
+      end
+      @access_token = token
+    end
 
     def configure(
       component_name:,
@@ -260,10 +303,6 @@ module LightStep
       collector_encryption: 'tls',
       transport: 'http_json',
       transport_callback: nil,
-      max_log_records: 1000,
-      max_span_records: 1000,
-      min_reporting_period_secs: 1.5,
-      max_reporting_period_secs: 30.0,
 
       # Internal debugging flag that enables additional logging and
       # tracer checks. Not intended to run in production as it may add
@@ -283,12 +322,12 @@ module LightStep
         dropped_spans: 0
       }
 
-      collector_port ||= collector_secure ? 443 : 80
-
-      self.verbose = verbose
       self.access_token = access_token
 
       start_time = now_micros.to_i
+      @tracer_report_start_time = start_time
+      @tracer_last_flush_micros = start_time
+
       @tracer_thrift_auth = {"access_token" => access_token}
       @tracer_thrift_runtime = {
         'guid' => guid,
@@ -301,31 +340,6 @@ module LightStep
         ]
       }
 
-      @tracer_min_flush_period_micros = 0
-      unless min_reporting_period_secs.nil?
-        @tracer_min_flush_period_micros = min_reporting_period_secs * 1E6
-      end
-
-      @tracer_max_flush_period_micros = 0
-      unless max_reporting_period_secs
-        @tracer_max_flush_period_micros = max_reporting_period_secs * 1E6
-      end
-
-      # Coerce invalid options into stable values
-      unless max_log_records > 0
-        max_log_records = 1
-        debug_record_error('Invalid value for max_log_records')
-      end
-      # TODO(ngauthier@gmail.com) move validation into setter
-      self.max_log_records = max_log_records
-
-      unless max_span_records > 0
-        max_span_records = 1
-        debug_record_error('Invalid value for max_span_records')
-      end
-      # TODO(ngauthier@gmail.com) move validation into setter
-      self.max_span_records = max_span_records
-
       @tracer_transport = nil
       case transport
       when 'nil'
@@ -333,6 +347,7 @@ module LightStep
       when 'callback'
         @tracer_transport = Transport::Callback.new(callback: transport_callback)
       when 'http_json'
+        collector_port ||= collector_secure ? 443 : 80
         @tracer_transport = Transport::HTTPJSON.new(
           host: collector_host,
           port: collector_port,
@@ -342,9 +357,6 @@ module LightStep
       else
         raise ConfigurationError, "unknown transport #{transport}"
       end
-
-      @tracer_report_start_time = start_time
-      @tracer_last_flush_micros = start_time
 
       # At exit, flush this objects data to the transport and close the transport
       # (which in turn will send the flushed data over the network).
@@ -370,36 +382,25 @@ module LightStep
       end
     end
 
-    def debug_record_error(e)
-      if verbose >= 2
-        warn e.to_s
-        exit(1)
-      end
-    end
-
     def flush_if_needed
       return unless enabled?
 
-      now = now_micros
-      delta = now - @tracer_last_flush_micros
+      delta = now_micros - @tracer_last_flush_micros
 
       # Set a bound on maximum flush frequency
-      return if delta < @tracer_min_flush_period_micros
+      return if delta < min_flush_period_micros
 
       # Look for a trigger that a flush is warranted
       # Set a bound of minimum flush frequency
-      if delta > @tracer_max_flush_period_micros ||
+      if delta > max_flush_period_micros ||
          @tracer_log_records.length >= max_log_records / 2 ||
          @tracer_span_records.length >= max_span_records / 2
         flush
       end
     end
 
-    def init_thrift_data_if_needed(component_name, access_token)
-    end
-
     def now_micros
-      (Time.now.to_f * 1e6).floor.to_i
+      (Time.now.to_f * 1e6).floor
     end
   end
 end

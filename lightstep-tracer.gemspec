@@ -5,7 +5,7 @@ require 'lightstep/tracer/version'
 
 Gem::Specification.new do |spec|
   spec.name          = 'lightstep-tracer'
-  spec.version       = Lightstep::Tracer::VERSION
+  spec.version       = LightStep::Tracer::VERSION
   spec.authors       = ['bcronin']
   spec.email         = ['support@lightstep.com']
 

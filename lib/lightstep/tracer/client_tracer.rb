@@ -1,12 +1,9 @@
 require 'json'
-require 'weakref'
 
-require 'lightstep/tracer/constants'
 require 'lightstep/tracer/client_span'
 require 'lightstep/tracer/transports/transport_http_json'
 require 'lightstep/tracer/transports/transport_nil'
 require 'lightstep/tracer/transports/transport_callback'
-require 'lightstep/tracer/version.rb'
 
 # FIXME(ngauthier@gmail.com) namespace
 class ClientTracer
@@ -47,9 +44,9 @@ class ClientTracer
 
   def inject(span, format, carrier)
     case format
-    when Lightstep::Tracer::FORMAT_TEXT_MAP
+    when LightStep::Tracer::FORMAT_TEXT_MAP
       _inject_to_text_map(span, carrier)
-    when Lightstep::Tracer::FORMAT_BINARY
+    when LightStep::Tracer::FORMAT_BINARY
       warn 'Binary inject format not yet implemented'
     else
       warn 'Unknown inject format'
@@ -58,9 +55,9 @@ class ClientTracer
 
   def join(operation_name, format, carrier)
     case format
-    when Lightstep::Tracer::FORMAT_TEXT_MAP
+    when LightStep::Tracer::FORMAT_TEXT_MAP
       _join_from_text_map(operation_name, carrier)
-    when Lightstep::Tracer::FORMAT_BINARY
+    when LightStep::Tracer::FORMAT_BINARY
       warn 'Binary join format not yet implemented'
       nil
     else
@@ -170,12 +167,12 @@ class ClientTracer
 
   # FIXME(ngauthier@gmail.com) private
   def _inject_to_text_map(span, carrier)
-    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
-    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_guid unless span.trace_guid.nil?
-    carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
+    carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
+    carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_guid unless span.trace_guid.nil?
+    carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
     span.baggage.each do |key, value|
-      carrier[Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX + key] = value
+      carrier[LightStep::Tracer::CARRIER_BAGGAGE_PREFIX + key] = value
     end
   end
 
@@ -185,14 +182,14 @@ class ClientTracer
     span.set_operation_name(operation_name)
     span.set_start_micros(now_micros)
 
-    parent_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid']
-    trace_guid = carrier[Lightstep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid']
+    parent_guid = carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid']
+    trace_guid = carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'traceid']
     span.trace_guid = trace_guid
     span.set_tag(:parent_span_guid, parent_guid)
 
     carrier.each do |key, value|
-      next unless key.start_with?(Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX)
-      plain_key = key.to_s[Lightstep::Tracer::CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
+      next unless key.start_with?(LightStep::Tracer::CARRIER_BAGGAGE_PREFIX)
+      plain_key = key.to_s[LightStep::Tracer::CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
       span.set_baggage_item(plain_key, value)
     end
     span
@@ -416,7 +413,7 @@ class ClientTracer
     # Tracer attributes
     runtime_attrs = {
       "lightstep_tracer_platform" => 'ruby',
-      "lightstep_tracer_version" => Lightstep::Tracer::VERSION,
+      "lightstep_tracer_version" => LightStep::Tracer::VERSION,
       "ruby_version" => RUBY_VERSION
     }
 

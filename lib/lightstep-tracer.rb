@@ -1,16 +1,27 @@
 require 'lightstep/tracer/client_tracer'
-require 'lightstep/tracer/constants'
 
+# TODO(ngauthier@gmail.com) this file should be lightstep.rb and only contain
+# requires. Then break all code out into lightstep/tracer/tracer.rb as
+# a singleton LightStep::Tracer class.
 module LightStep
+  module Tracer
+    FORMAT_TEXT_MAP = 1
+    FORMAT_BINARY = 2
+
+    CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
+    CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
+  end
+
   # TODO(ngauthier@gmail.com) singleton?
+  # TODO(ngauthier@gmail.com) LightStep::Tracer as instance
   @@instance = nil
 
   def self.FORMAT_TEXT_MAP
-    Lightstep::Tracer::FORMAT_TEXT_MAP
+    LightStep::Tracer::FORMAT_TEXT_MAP
   end
 
   def self.FORMAT_BINARY
-    Lightstep::Tracer::FORMAT_BINARY
+    LightStep::Tracer::FORMAT_BINARY
   end
 
   def self.init_global_tracer(component_name, access_token, opts = nil)

@@ -1,9 +1,9 @@
 require 'json'
 
 require 'lightstep/tracer/span'
-require 'lightstep/tracer/transports/transport_http_json'
-require 'lightstep/tracer/transports/transport_nil'
-require 'lightstep/tracer/transports/transport_callback'
+require 'lightstep/tracer/transport/http_json'
+require 'lightstep/tracer/transport/nil'
+require 'lightstep/tracer/transport/callback'
 
 module LightStep
   class Tracer
@@ -341,11 +341,11 @@ module LightStep
       self.max_span_records = options[:max_span_records]
 
       @tracer_transport = if options[:transport] == 'nil'
-                            TransportNil.new
+                            Transport::Nil.new
                           elsif options[:transport] == 'callback'
-                            TransportCallback.new(callback: options[:transport_callback])
+                            Transport::Callback.new(callback: options[:transport_callback])
                           else
-                            TransportHTTPJSON.new(host: options[:collector_host], port: options[:collector_port], verbose: verbose, secure: options[:collector_encryption] != 'none')
+                            Transport::HTTPJSON.new(host: options[:collector_host], port: options[:collector_port], verbose: verbose, secure: options[:collector_encryption] != 'none')
                           end
 
       # Note: the GUID is not generated until the library is initialized

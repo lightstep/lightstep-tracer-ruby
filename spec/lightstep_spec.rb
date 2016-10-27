@@ -23,7 +23,7 @@ describe LightStep do
   it 'should return a valid span from start_span' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    expect(span).to be_an_instance_of ClientSpan
+    expect(span).to be_an_instance_of LightStep::Span
     span.finish
   end
 

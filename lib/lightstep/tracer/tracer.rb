@@ -5,7 +5,6 @@ require 'lightstep/tracer/transports/transport_http_json'
 require 'lightstep/tracer/transports/transport_nil'
 require 'lightstep/tracer/transports/transport_callback'
 
-# FIXME(ngauthier@gmail.com) namespace
 module LightStep
   class Tracer
     FORMAT_TEXT_MAP = 1
@@ -40,7 +39,7 @@ module LightStep
     # TODO(ngauthier@gmail.com) fields should be tags
     # TODO(ngauthier@gmail.com) ability to provide a timestamp to be used other than now
     def start_span(operation_name, fields = nil)
-      span = ClientSpan.new(self)
+      span = Span.new(self)
       span.set_operation_name(operation_name)
       span.set_start_micros(now_micros)
 
@@ -108,7 +107,7 @@ module LightStep
 
     # FIXME(ngauthier@gmail.com) private
     def _join_from_text_map(operation_name, carrier)
-      span = ClientSpan.new(self)
+      span = Span.new(self)
       span.set_operation_name(operation_name)
       span.set_start_micros(now_micros)
 

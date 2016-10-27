@@ -4,7 +4,7 @@ require 'lightstep-tracer'
 require 'rack'
 require 'rack/server'
 
-LightStep.init_global_tracer('lightstep/ruby/examples/rack', '{your_access_token}')
+LightStep.init_global_tracer(component_name: 'lightstep/ruby/examples/rack', access_token: '{your_access_token}')
 
 class HelloWorldApp
   def self.call(env)

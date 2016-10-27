@@ -1,7 +1,7 @@
 require 'bundler/setup'
 require 'lightstep-tracer'
 
-LightStep.configure('lightstep/ruby/example', '{your_access_token}')
+LightStep.configure(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
 
 puts 'Starting...'
 

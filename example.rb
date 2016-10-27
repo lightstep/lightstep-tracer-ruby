@@ -6,7 +6,7 @@ require 'lightstep-tracer'
 
 access_token = "{your_access_token}"
 
-LightStep.configure('lightstep/ruby/example', access_token)
+LightStep.configure(component_name: 'lightstep/ruby/example', access_token: access_token)
 
 puts 'Starting operation...'
 span = LightStep.start_span('my_span')

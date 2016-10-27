@@ -8,7 +8,7 @@ SimpleCov.command_name "examples/fork_children/main.rb"
 SimpleCov.start
 require 'lightstep-tracer'
 
-LightStep.configure('lightstep/ruby/examples/fork_children', '{your_access_token}')
+LightStep.configure(component_name: 'lightstep/ruby/examples/fork_children', access_token: '{your_access_token}')
 
 puts 'Starting...'
 for k in 1..20

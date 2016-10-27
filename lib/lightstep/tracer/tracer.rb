@@ -131,8 +131,6 @@ module LightStep
       end
     end
 
-
-
     # FIXME(ngauthier@gmail.com) private
     def _inject_to_text_map(span, carrier)
       carrier[LightStep::Tracer::CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid

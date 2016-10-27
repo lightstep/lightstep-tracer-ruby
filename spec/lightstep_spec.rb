@@ -2,13 +2,14 @@ require 'spec_helper'
 
 # FIXME(ngauthier@gmail.com) scope leak move into describe
 def init_test_tracer
-  LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}', transport: 'nil')
+  LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', access_token: '{your_access_token}', transport: 'nil')
 end
 
 # FIXME(ngauthier@gmail.com) scope leak move into describe
 def init_callback_tracer(callback)
-  tracer = LightStep.init_new_tracer(
-    'lightstep/ruby/spec', '{your_access_token}',
+  tracer = LightStep::Tracer.new(
+    component_name: 'lightstep/ruby/spec',
+    access_token: '{your_access_token}',
     transport: 'callback',
     transport_callback: callback)
 end
@@ -16,7 +17,7 @@ end
 describe LightStep do
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
-    expect(tracer).to be_an_instance_of ClientTracer
+    expect(tracer).to be_an_instance_of LightStep::Tracer
   end
 
   it 'should return a valid span from start_span' do
@@ -209,8 +210,9 @@ describe LightStep do
   it 'should report payloads correctly' do
     # "Report" to an object so we can examine the result
     result = nil
-    tracer = LightStep.init_new_tracer(
-      'lightstep/ruby/spec', '{your_access_token}',
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      access_token: '{your_access_token}',
       transport: 'callback',
       transport_callback: proc { |obj|; result = obj; })
 

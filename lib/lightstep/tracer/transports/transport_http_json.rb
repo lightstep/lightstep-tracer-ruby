@@ -1,23 +1,16 @@
 require 'net/http'
 # FIXME(ngauthier@gmail.com) namespace
 class TransportHTTPJSON
-  def initialize
+  def initialize(host:, port:, verbose: 0, secure: true)
     # Configuration
-    @host = ''
-    @port = 0
-    @verbose = 0
-    @secure = true
+    @host = host
+    @port = port
+    @verbose = verbose
+    @secure = secure
 
     @thread = nil
     @thread_pid = 0 # process ID that created the thread
     @queue = nil
-  end
-
-  def ensure_connection(options)
-    @verbose = options[:verbose]
-    @host = options[:collector_host]
-    @port = options[:collector_port]
-    @secure = (options[:collector_encryption] != 'none')
   end
 
   def flush_report(auth, report)

@@ -1,7 +1,7 @@
-require 'bundler'
+require 'bundler/setup'
 require 'lightstep-tracer'
 
-LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
+LightStep.configure('lightstep/ruby/example', '{your_access_token}')
 
 puts 'Starting...'
 

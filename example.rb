@@ -1,10 +1,10 @@
-require 'bundler'
+require 'bundler/setup'
 require 'simplecov'
 SimpleCov.command_name "example.rb"
 SimpleCov.start
 require 'lightstep-tracer'
 
-LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
+LightStep.configure('lightstep/ruby/example', '{your_access_token}')
 
 puts 'Starting operation...'
 span = LightStep.start_span('my_span')

@@ -1,13 +1,13 @@
 require 'benchmark'
 require 'securerandom'
 
-require 'bundler'
+require 'bundler/setup'
 require 'lightstep-tracer'
 
 rng = Random.new
 
 # Run a quick profile on logging lots of spans
-tracer = LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}', transport: 'nil')
+tracer = LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', access_token: '{your_access_token}', transport: 'nil')
 
 Benchmark.bm(32) do |x|
   x.report('Random.bytes.unpack') do

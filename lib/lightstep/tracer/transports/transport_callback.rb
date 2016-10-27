@@ -1,11 +1,7 @@
 # FIXME(ngauthier@gmail.com) namespace
 class TransportCallback
-  def initialize
-    @callback = nil
-  end
-
-  def ensure_connection(options)
-    @callback = options[:transport_callback]
+  def initialize(callback:)
+    @callback = callback
   end
 
   def flush_report(_auth, report)

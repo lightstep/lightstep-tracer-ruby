@@ -93,14 +93,14 @@ module LightStep
     # TODO(ngauthier@gmail.com) ability to provide a timestamp to be used other than now
     def start_span(operation_name, fields = nil)
       span = Span.new(self)
-      span.set_operation_name(operation_name)
-      span.set_start_micros(now_micros)
+      span.operation_name = operation_name
+      span.start_micros = now_micros
 
       unless fields.nil?
         span.set_parent(fields[:parent]) unless fields[:parent].nil?
         span.set_tags(fields[:tags]) unless fields[:tags].nil?
-        span.set_start_micros(fields[:startTime] * 1000) unless fields[:startTime].nil?
-        span.set_end_micros(fields[:endTime] * 1000) unless fields[:endTime].nil?
+        span.start_micros = fields[:startTime] * 1000 unless fields[:startTime].nil?
+        span.end_micros = fields[:endTime] * 1000 unless fields[:endTime].nil?
       end
 
       span.trace_guid = generate_guid if span.trace_guid.nil?
@@ -161,8 +161,8 @@ module LightStep
     def _finish_span(span)
       return unless enabled?
 
-      span.set_end_micros(now_micros) if span.end_micros === 0
-      full = push_with_max(@tracer_span_records, span.to_thrift, max_span_records)
+      span.end_micros = now_micros if span.end_micros === 0
+      full = push_with_max(@tracer_span_records, span.to_h, max_span_records)
       @tracer_counters[:dropped_spans] += 1 if full
       flush_if_needed
     end
@@ -312,8 +312,8 @@ module LightStep
 
     def join_from_text_map(operation_name, carrier)
       span = Span.new(self)
-      span.set_operation_name(operation_name)
-      span.set_start_micros(now_micros)
+      span.operation_name = operation_name
+      span.start_micros = now_micros
 
       parent_guid = carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid']
       trace_guid = carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid']

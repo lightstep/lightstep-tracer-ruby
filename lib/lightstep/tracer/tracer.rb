@@ -216,7 +216,7 @@ module LightStep
 
       @tracer_last_flush_micros = now
 
-      resp = @tracer_transport.flush_report(@tracer_thrift_auth, report_request)
+      resp = @tracer_transport.flush_report(report_request)
 
       # ALWAYS reset the buffers and update the counters as the RPC response
       # is, by design, not waited for and not reliable.
@@ -296,24 +296,11 @@ module LightStep
 
     def configure(
       component_name:,
-      access_token:,
-      collector_host: 'collector.lightstep.com',
-      collector_port: nil,
-      collector_secure: true,
-      collector_encryption: 'tls',
-      transport: 'http_json',
-      transport_callback: nil,
-
-      # Internal debugging flag that enables additional logging and
-      # tracer checks. Not intended to run in production as it may add
-      # logging "noise" to the calling code.
-      verbose: 0
+      access_token: nil,
+      transport: nil
     )
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
-
-      raise ConfigurationError, "access_token must be a string" unless String === access_token
-      raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
 
       @tracer_log_records = []
       @tracer_span_records = []
@@ -322,13 +309,10 @@ module LightStep
         dropped_spans: 0
       }
 
-      self.access_token = access_token
-
       start_time = now_micros.to_i
       @tracer_report_start_time = start_time
       @tracer_last_flush_micros = start_time
 
-      @tracer_thrift_auth = {"access_token" => access_token}
       @tracer_thrift_runtime = {
         'guid' => guid,
         'start_micros' => start_time,
@@ -340,22 +324,16 @@ module LightStep
         ]
       }
 
-      @tracer_transport = nil
-      case transport
-      when 'nil'
-        @tracer_transport = Transport::Nil.new
-      when 'callback'
-        @tracer_transport = Transport::Callback.new(callback: transport_callback)
-      when 'http_json'
-        collector_port ||= collector_secure ? 443 : 80
-        @tracer_transport = Transport::HTTPJSON.new(
-          host: collector_host,
-          port: collector_port,
-          verbose: verbose,
-          secure: collector_encryption != 'none'
-        )
+      if !transport.nil?
+        if !(LightStep::Transport::Base === transport)
+          raise ConfigurationError, "transport is not a LightStep transport class: #{transport}"
+        end
+        @tracer_transport = transport
       else
-        raise ConfigurationError, "unknown transport #{transport}"
+        if access_token.nil?
+          raise ConfigurationError, "you must provide an access token or a transport"
+        end
+        @tracer_transport = Transport::HTTPJSON.new(access_token: access_token)
       end
 
       # At exit, flush this objects data to the transport and close the transport

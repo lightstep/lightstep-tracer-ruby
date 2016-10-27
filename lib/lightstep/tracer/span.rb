@@ -102,13 +102,6 @@ module LightStep
       @tags[:parent_span_guid]
     end
 
-    # FIXME(ngauthier@gmail.com) constant prefix
-    # FIXME(ngauthier@gmail.com) safe url generation?
-    # FIXME(ngauthier@gmail.com) getter
-    def generate_trace_url
-      "https://app.lightstep.com/#{@tracer.access_token}/trace?span_guid=#{@guid}&at_micros=#{start_micros}"
-    end
-
     # FIXME(ngauthier@gmail.com) writer
     def set_parent(span)
       set_tag(:parent_span_guid, span.guid)

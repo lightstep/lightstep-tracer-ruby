@@ -1,11 +1,13 @@
+require 'lightstep/tracer/transport/base'
+
 module LightStep
   module Transport
-    class Callback
+    class Callback < Base
       def initialize(callback:)
         @callback = callback
       end
 
-      def flush_report(_auth, report)
+      def flush_report(report)
         @callback.call(report)
         nil
       end

@@ -1,23 +1,31 @@
 require 'net/http'
+require 'lightstep/tracer/transport/base'
 
 module LightStep
   module Transport
-    class HTTPJSON
-      def initialize(host:, port:, verbose: 0, secure: true)
+    class HTTPJSON < Base
+      LIGHTSTEP_HOST = "collector.lightstep.com"
+      LIGHTSTEP_PORT = 443
+
+      def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, secure: true, access_token:)
         # Configuration
         @host = host
         @port = port
         @verbose = verbose
         @secure = secure
 
+        raise ConfigurationError, "access_token must be a string" unless String === access_token
+        raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
+        @access_token = access_token
+
         @thread = nil
         @thread_pid = 0 # process ID that created the thread
         @queue = nil
       end
 
-      def flush_report(auth, report)
-        if auth.nil? || report.nil?
-          puts 'Auth or report not set.' if @verbose > 0
+      def flush_report(report)
+        if report.nil?
+          puts 'Report not set.' if @verbose > 0
           return nil
         end
         puts report.inspect if @verbose >= 3
@@ -36,7 +44,7 @@ module LightStep
           host: @host,
           port: @port,
           secure: @secure,
-          access_token: auth['access_token'],
+          access_token: @access_token,
           content: report,
           verbose: @verbose
         }

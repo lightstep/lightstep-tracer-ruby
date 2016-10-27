@@ -4,7 +4,9 @@ SimpleCov.command_name "example.rb"
 SimpleCov.start
 require 'lightstep-tracer'
 
-LightStep.configure('lightstep/ruby/example', '{your_access_token}')
+access_token = "{your_access_token}"
+
+LightStep.configure('lightstep/ruby/example', access_token)
 
 puts 'Starting operation...'
 span = LightStep.start_span('my_span')
@@ -29,4 +31,4 @@ end
 span.finish
 
 puts 'Done!'
-puts span.generate_trace_url
+puts "https://app.lightstep.com/#{access_token}/trace?span_guid=#{span.guid}&at_micros=#{span.start_micros}"

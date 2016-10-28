@@ -28,11 +28,11 @@ module LightStep
 
     # Initialize a new tracer. Either an access_token or a transport must be
     # provided. A component_name is always required.
-    # @param $component_name Component name to use for the tracer
-    # @param $access_token The project access token when pushing to LightStep
-    # @param $transport LightStep::Transport to use
+    # @param component_name [String] Component name to use for the tracer
+    # @param access_token [String] The project access token when pushing to LightStep
+    # @param transport [LightStep::Transport] How the data should be transported
     # @return LightStep::Tracer
-    # @throws LightStep::ConfigurationError if the group name or access token is not a valid string.
+    # @raise LightStep::ConfigurationError if the group name or access token is not a valid string.
     def initialize(component_name:, access_token: nil, transport: nil)
       configure(component_name: component_name, access_token: access_token, transport: transport)
     end
@@ -69,8 +69,14 @@ module LightStep
       @max_flush_period_micros = [DEFAULT_MAX_REPORTING_PERIOD_SECS, secs].min * 1E6
     end
 
-    # Starts a new span.
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
+
+    # Starts a new span.
+    # @param operation_name [String] the operation name for the Span
+    # @param child_of [Span] Span to inherit from
+    # @param start_time [Time] When the Span started, if not now
+    # @param tags [Hash] tags for the span
+    # @return [Span]
     def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
       child_of_guid = nil
       trace_guid = nil
@@ -91,6 +97,10 @@ module LightStep
       )
     end
 
+    # Inject a span into the given carrier
+    # @param span [Span]
+    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
+    # @param carrier [Hash-like]
     def inject(span, format, carrier)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
@@ -102,6 +112,11 @@ module LightStep
       end
     end
 
+    # Extract a span from a carrier
+    # @param operation_name [String]
+    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
+    # @param carrier [Hash-like]
+    # @return [Span]
     def extract(operation_name, format, carrier)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
@@ -133,11 +148,13 @@ module LightStep
       @tracer_transport.flush
     end
 
+    # Flush to the Transport
     def flush
       _flush_worker
     end
 
     # Internal use only.
+    # @private
     def _finish_span(span, end_time: Time.now)
       return unless enabled?
 
@@ -147,6 +164,8 @@ module LightStep
       flush_if_needed
     end
 
+    # Internal use only
+    # @private
     def raw_log_record(fields, payload)
       return unless enabled?
 

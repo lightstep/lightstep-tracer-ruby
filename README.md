@@ -8,9 +8,8 @@ The LightStep distributed tracing library for Ruby.
 
 Add this line to your application's Gemfile:
 
-```ruby
-gem 'lightstep-tracer'
-```
+    gem 'lightstep-tracer'
+
 
 And then execute:
 
@@ -23,24 +22,22 @@ Or install it yourself as:
 
 ## Getting started
 
-```ruby
-require 'lightstep-tracer'
+    require 'lightstep-tracer'
 
-# Initialize the singleton tracer
-LightStep.configure(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
+    # Initialize the singleton tracer
+    LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token')
 
-# Create a basic span and attach a log to the span
-span = LightStep.start_span('my_span')
-span.log_event('hello world', 'count' => 42)
+    # Create a basic span and attach a log to the span
+    span = LightStep.start_span('my_span')
+    span.log_event('hello world', 'count' => 42)
 
-# Create a child span (and add some artificial delays to illustrate the timing)
-sleep(0.1)
-child = LightStep.start_span('my_child', child_of: span)
-sleep(0.2)
-child.finish
-sleep(0.1)
-span.finish
-```
+    # Create a child span (and add some artificial delays to illustrate the timing)
+    sleep(0.1)
+    child = LightStep.start_span('my_child', child_of: span)
+    sleep(0.2)
+    child.finish
+    sleep(0.1)
+    span.finish
 
 ## Thread Safety
 

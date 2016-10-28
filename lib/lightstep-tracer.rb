@@ -1,17 +1,11 @@
 require 'forwardable'
 
+# LightStep Tracer
 module LightStep
   extend SingleForwardable
 
+  # Base class for all LightStep errors
   class Error < StandardError; end
-
-  def self.FORMAT_TEXT_MAP
-    LightStep::Tracer::FORMAT_TEXT_MAP
-  end
-
-  def self.FORMAT_BINARY
-    LightStep::Tracer::FORMAT_BINARY
-  end
 
   # Returns the singleton instance of the Tracer.
   def self.instance

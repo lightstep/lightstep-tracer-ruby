@@ -17,6 +17,13 @@ module LightStep
 
       class QueueFullError < LightStep::Error; end
 
+      # Initialize the transport
+      # @param host [String] host of the domain to the endpoind to push data
+      # @param port [Numeric] port on which to connect
+      # @param verbose [Numeric] verbosity level. Right now 0-3 are supported
+      # @param secure [Boolean]
+      # @param access_token [String] access token for LightStep server
+      # @return [HTTPJSON]
       def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, secure: true, access_token:)
         @host = host
         @port = port
@@ -30,6 +37,7 @@ module LightStep
         start_queue
       end
 
+      # Queue a report for sending
       def report(report)
         p report if @verbose >= 3
         # TODO(ngauthier@gmail.com): the queue could be full here if we're
@@ -47,15 +55,18 @@ module LightStep
         raise QueueFullError
       end
 
+      # Flush the current queue
       def flush
         close
         start_queue
       end
 
+      # Clear the current queue, deleting pending items
       def clear
         @queue.clear
       end
 
+      # Close the transport. No further data can be sent!
       def close
         @queue.close
         @thread.join

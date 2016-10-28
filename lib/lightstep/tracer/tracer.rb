@@ -105,10 +105,10 @@ module LightStep
       end
     end
 
-    def join(operation_name, format, carrier)
+    def extract(operation_name, format, carrier)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
-        join_from_text_map(operation_name, carrier)
+        extract_from_text_map(operation_name, carrier)
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
@@ -302,7 +302,7 @@ module LightStep
       end
     end
 
-    def join_from_text_map(operation_name, carrier)
+    def extract_from_text_map(operation_name, carrier)
       span = Span.new(
         tracer: self,
         operation_name: operation_name,

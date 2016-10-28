@@ -255,7 +255,7 @@ describe LightStep do
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
-    span2 = tracer.join('test_span_2', LightStep.FORMAT_TEXT_MAP, carrier)
+    span2 = tracer.extract('test_span_2', LightStep.FORMAT_TEXT_MAP, carrier)
     expect(span2.trace_guid).to eq(span1.trace_guid)
     expect(span2.tags[:parent_span_guid]).to eq(span1.guid)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')

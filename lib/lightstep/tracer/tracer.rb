@@ -1,4 +1,5 @@
 require 'json'
+require 'concurrent'
 
 require 'lightstep/tracer/span'
 require 'lightstep/tracer/transport/http_json'
@@ -23,7 +24,7 @@ module LightStep
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
-    attr_reader :access_token
+    attr_reader :access_token, :guid
 
     # Initialize a new tracer. Either an access_token or a transport must be
     # provided. A component_name is always required.
@@ -114,11 +115,6 @@ module LightStep
       end
     end
 
-    # The GUID of the tracer
-    def guid
-      @guid ||= generate_guid
-    end
-
     # @return true if the tracer is enabled
     def enabled?
       @enabled ||= true
@@ -147,7 +143,7 @@ module LightStep
 
       span.end_micros ||= micros(end_time)
       full = push_with_max(@tracer_span_records, span.to_h, max_span_records)
-      @tracer_counters[:dropped_spans] += 1 if full
+      @dropped_spans.increment if full
       flush_if_needed
     end
 
@@ -180,7 +176,7 @@ module LightStep
       end
 
       full = push_with_max(@tracer_log_records, fields, max_log_records)
-      @tracer_counters[:dropped_logs] += 1 if full
+      @dropped_logs.increment if full
     end
 
     # Returns a random guid. Note: this intentionally does not use SecureRandom,
@@ -203,14 +199,13 @@ module LightStep
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      @tracer_log_records = []
-      @tracer_span_records = []
-      @tracer_counters = {
-        dropped_logs: 0,
-        dropped_spans: 0
-      }
+      @tracer_log_records = Concurrent::Array.new
+      @tracer_span_records = Concurrent::Array.new
+      @dropped_logs = Concurrent::AtomicFixnum.new
+      @dropped_spans = Concurrent::AtomicFixnum.new
 
       start_time = now_micros.to_i
+      @guid = generate_guid
       @tracer_report_start_time = start_time
       @tracer_last_flush_micros = start_time
 
@@ -246,19 +241,17 @@ module LightStep
     end
 
     def push_with_max(arr, item, max)
-      max = 1 unless max > 0
+      max = 1 if max < 1
+      arr.push item
 
-      arr << item
-
-      # Simplistic random discard
-      count = arr.size
-      if count > max
-        i = rand(0..(max - 2)) # rand(a..b) is inclusive
-        arr[i] = arr.pop
-        return true
-      else
+      if arr.size <= max
         return false
       end
+
+      while arr.size > max
+        arr.delete_at(rand(arr.size))
+      end
+      return true
     end
 
     def flush_if_needed
@@ -326,37 +319,36 @@ module LightStep
 
       return if @tracer_log_records.empty? && @tracer_span_records.empty?
 
-      # Convert the counters to thrift form
-      thrift_counters = @tracer_counters.map do |key, value|
-        {"Name" => key.to_s, "Value" => value.to_i}
-      end
+      log_records = @tracer_log_records.slice!(0, @tracer_log_records.length)
+      span_records = @tracer_span_records.slice!(0, @tracer_span_records.length)
+      dropped_logs = 0
+      dropped_spans = 0
+      @dropped_logs.update{|old| dropped_logs = old; 0 }
+      @dropped_spans.update{|old| dropped_spans = old; 0 }
 
       report_request = {
         'runtime' => @tracer_thrift_runtime,
         'oldest_micros' => @tracer_report_start_time.to_i,
         'youngest_micros' => now.to_i,
-        'log_records' => @tracer_log_records,
-        'span_records' => @tracer_span_records,
-        'counters' => thrift_counters
+        'log_records' => log_records,
+        'span_records' => span_records,
+        'counters' => [
+            {"Name": "dropped_logs", "Value": dropped_logs},
+            {"Name": "dropped_spans", "Value": dropped_spans},
+        ]
       }
 
       @tracer_last_flush_micros = now
+      @tracer_report_start_time = now
 
       begin
         @tracer_transport.report(report_request)
-        # reset the counters if it was queued
-        @tracer_counters.each do |key, _value|
-          @tracer_counters[key] = 0
-        end
       rescue LightStep::Transport::HTTPJSON::QueueFullError
-        # If the queue is full, preserve counters and add logs and spans to them
-        @tracer_counters[:dropped_logs] += @tracer_log_records.size
-        @tracer_counters[:dropped_spans] += @tracer_span_records.size
-      ensure
-        # Always reset records to discard when lagging
-        @tracer_report_start_time = now
-        @tracer_log_records = []
-        @tracer_span_records = []
+        # If the queue is full, add the previous dropped logs to the logs
+        # that were going to get reported, as well as the previous dropped
+        # spans and spans that would have been recorded
+        @dropped_logs.increment(dropped_logs + log_records.length)
+        @dropped_spans.increment(dropped_spans + span_records.length)
       end
     end
   end

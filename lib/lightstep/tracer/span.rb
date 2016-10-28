@@ -107,7 +107,6 @@ module LightStep
         "attributes" => attributes,
         "oldest_micros" => start_micros,
         "youngest_micros" => end_micros,
-        # TODO(ngauthier@gmail.com) this wasn't used anywhere and was always false, can we remove?
         "error_flag" => false
       }
     end

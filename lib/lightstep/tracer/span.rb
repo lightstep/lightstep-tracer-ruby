@@ -100,13 +100,13 @@ module LightStep
       end
 
       rec = {
-        "runtime_guid" => @tracer.guid.to_s,
-        "span_guid" => @guid.to_s,
-        "trace_guid" => @trace_guid.to_s,
-        "span_name" => @operation.to_s,
+        "runtime_guid" => tracer.guid,
+        "span_guid" => guid,
+        "trace_guid" => trace_guid,
+        "span_name" => operation_name,
         "attributes" => attributes,
-        "oldest_micros" => @start_micros.to_i,
-        "youngest_micros" => @end_micros.to_i,
+        "oldest_micros" => start_micros,
+        "youngest_micros" => end_micros,
         # TODO(ngauthier@gmail.com) this wasn't used anywhere and was always false, can we remove?
         "error_flag" => false
       }

@@ -39,6 +39,8 @@ module LightStep
       self
     end
 
+    # TODO(ngauthier@gmail.com) baggage keys have a restricted format according
+    # to the spec: http://opentracing.io/documentation/pages/spec#baggage-vs-span-tags
     def set_baggage_item(key, value)
       @baggage[key] = value
       self

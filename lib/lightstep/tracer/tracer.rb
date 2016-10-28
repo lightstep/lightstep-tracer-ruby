@@ -72,13 +72,9 @@ module LightStep
       @max_flush_period_micros = [DEFAULT_MAX_REPORTING_PERIOD_SECS, secs].min * 1E6
     end
 
-    # ----------------------------------------------------------------------------
-    #  OpenTracing API
-    # ----------------------------------------------------------------------------
-
     # Starts a new span.
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
-    def start_span(operation_name, child_of: nil, start_time: nil, end_time: nil, tags: nil)
+    def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
       child_of_guid = nil
       trace_guid = nil
       if Span === child_of
@@ -94,7 +90,6 @@ module LightStep
         child_of_guid: child_of_guid,
         trace_guid: trace_guid,
         start_micros: start_time.nil? ? now_micros : micros(start_time),
-        end_micros: end_time.nil? ? nil : micros(end_time),
         tags: tags
       )
     end

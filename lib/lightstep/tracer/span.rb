@@ -13,7 +13,6 @@ module LightStep
       child_of_guid: nil,
       trace_guid:,
       start_micros:,
-      end_micros: nil,
       tags: nil
     )
       @tags = Hash(tags)
@@ -23,7 +22,6 @@ module LightStep
       @guid = tracer.generate_guid
       self.operation_name = operation_name
       self.start_micros = start_micros
-      self.end_micros = end_micros
       self.trace_guid = trace_guid
       set_tag(:parent_span_guid, child_of_guid) if !child_of_guid.nil?
     end

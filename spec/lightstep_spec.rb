@@ -80,12 +80,12 @@ describe LightStep do
     span1.finish
     expect(span1.start_micros).to eq(t1_micros)
 
-    span2 = tracer.start_span('test2', end_time: t1)
-    span2.finish
+    span2 = tracer.start_span('test2')
+    span2.finish(end_time: t1)
     expect(span2.end_micros).to eq(t1_micros)
 
-    span3 = tracer.start_span('test3', start_time: t1, end_time: t2)
-    span3.finish
+    span3 = tracer.start_span('test3', start_time: t1)
+    span3.finish(end_time: t2)
     expect(span3.start_micros).to eq(t1_micros)
     expect(span3.end_micros).to eq(t2_micros)
   end

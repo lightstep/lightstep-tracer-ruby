@@ -15,6 +15,8 @@ module LightStep
       LIGHTSTEP_PORT = 443
       QUEUE_SIZE = 16
 
+      class QueueFullError < LightStep::Error; end
+
       def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, secure: true, access_token:)
         @host = host
         @port = port
@@ -32,15 +34,17 @@ module LightStep
         p report if @verbose >= 3
         # TODO(ngauthier@gmail.com): the queue could be full here if we're
         # lagging, which would cause this to block!
-        @queue << {
+        @queue.push({
           host: @host,
           port: @port,
           secure: @secure,
           access_token: @access_token,
           content: report,
           verbose: @verbose
-        }
+        }, true)
         nil
+      rescue ThreadError
+        raise QueueFullError
       end
 
       def flush
@@ -84,6 +88,9 @@ module LightStep
         res = https.request(req)
 
         puts res.to_s if params[:verbose] >= 3
+
+        # TODO(ngauthier@gmail.com): log unknown commands
+        # TODO(ngauthier@gmail.com): log errors from server
       end
     end
   end

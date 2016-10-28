@@ -28,6 +28,8 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
     span.set_tag('key', 'value')
+    span.set_tag('bool', true)
+    span.set_tag('number', 500)
     span.set_baggage_item('baggage_key', 'baggage_item')
     span.log_event('event_name', key: 'value')
     span.finish

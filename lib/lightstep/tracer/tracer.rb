@@ -20,7 +20,7 @@ module LightStep
     DEFAULT_MIN_REPORTING_PERIOD_SECS = 1.5
     DEFAULT_MAX_REPORTING_PERIOD_SECS = 30.0
 
-    class Error < StandardError; end
+    class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
     attr_reader :access_token

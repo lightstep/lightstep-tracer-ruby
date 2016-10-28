@@ -1,9 +1,9 @@
 require 'forwardable'
-require 'lightstep/tracer/tracer'
-require 'lightstep/tracer/global_tracer'
 
 module LightStep
   extend SingleForwardable
+
+  class Error < StandardError; end
 
   def self.FORMAT_TEXT_MAP
     LightStep::Tracer::FORMAT_TEXT_MAP
@@ -24,3 +24,6 @@ module LightStep
   def_delegator :instance, :enable
   def_delegator :instance, :flush
 end
+
+require 'lightstep/tracer/tracer'
+require 'lightstep/tracer/global_tracer'

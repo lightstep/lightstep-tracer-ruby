@@ -6,12 +6,20 @@ module LightStep
     #  OpenTracing API
     # ----------------------------------------------------------------------------
 
+    class UnsupportedValueTypeError < LightStep::Error; end
+
     attr_reader :tracer
 
     # TODO(ngauthier@gmail.com) validate value is string, bool, or number and
     # remove value.to_s from all calling code
     def set_tag(key, value)
-      @tags[key] = value
+      case value
+      when String, Fixnum, TrueClass, FalseClass
+        @tags[key] = value
+      else
+       raise UnsupportedValueTypeError,
+         "Value must be a string, number, or boolean: #{value.inspect} is a #{value.class.name}"
+      end
       self
     end
 

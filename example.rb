@@ -1,10 +1,10 @@
 require 'bundler/setup'
 require 'simplecov'
-SimpleCov.command_name "example.rb"
+SimpleCov.command_name 'example.rb'
 SimpleCov.start
 require 'lightstep-tracer'
 
-access_token = "{your_access_token}"
+access_token = '{your_access_token}'
 
 LightStep.configure(component_name: 'lightstep/ruby/example', access_token: access_token)
 

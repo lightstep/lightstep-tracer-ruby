@@ -7,7 +7,10 @@ require 'lightstep-tracer'
 rng = Random.new
 
 # Run a quick profile on logging lots of spans
-tracer = LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', transport: LightStep::Transport::Nil.new)
+tracer = LightStep::Tracer.new(
+  component_name: 'lightstep/ruby/spec',
+  transport: LightStep::Transport::Nil.new
+)
 
 Benchmark.bm(32) do |x|
   x.report('Random.bytes.unpack') do

@@ -25,16 +25,12 @@ module LightStep
 
     attr_reader :access_token
 
-    # ----------------------------------------------------------------------------
-    # Implemenation specific
-    # ----------------------------------------------------------------------------
-
     # Initialize a new tracer. Either an access_token or a transport must be
     # provided. A component_name is always required.
     # @param $component_name Component name to use for the tracer
     # @param $access_token The project access token when pushing to LightStep
     # @param $transport LightStep::Transport to use
-    # @return LightStepBase_Tracer
+    # @return LightStep::Tracer
     # @throws LightStep::ConfigurationError if the group name or access token is not a valid string.
     def initialize(component_name:, access_token: nil, transport: nil)
       configure(component_name: component_name, access_token: access_token, transport: transport)
@@ -363,6 +359,9 @@ module LightStep
           disable if cmd.disable
         end
       end
+
+      # TODO(ngauthier@gmail.com): log unknown commands
+      # TODO(ngauthier@gmail.com): log errors from server
     end
   end
 end

@@ -104,7 +104,7 @@ module LightStep
 
     def to_h
       attributes = @tags.map do |key, value|
-        {"Key" => key.to_s, "Value" => value.to_s}
+        {"Key" => key.to_s, "Value" => value}
       end
 
       rec = {

@@ -5,12 +5,11 @@ module LightStep
   module Transport
     # HTTPJSON is a transport that sends reports via HTTP in JSON format.
     # It is thread-safe, however it is *not* fork-safe. When forking, all items
-    # in the queue will be copied and sent in duplicate. Therefore, when forking,
-    # you should first flush the queue with `flush`, then fork, then resume
-    # use of the Tracer.
+    # in the queue will be copied and sent in duplicate.
     #
-    # You may also simply initialize the tracer after forking, if you are forking
-    # at the beginning of your server to establish worker processes.
+    # When forking, you should first `disable` the tracer, then `enable` it from
+    # within the fork (and in the parent post-fork). See
+    # `examples/fork_children/main.rb` for an example.
     class HTTPJSON < Base
       LIGHTSTEP_HOST = "collector.lightstep.com"
       LIGHTSTEP_PORT = 443

@@ -3,9 +3,6 @@
 # and reenabled afterward.
 #
 require 'bundler/setup'
-require 'simplecov'
-SimpleCov.command_name "examples/fork_children/main.rb"
-SimpleCov.start
 require 'lightstep-tracer'
 
 LightStep.configure(component_name: 'lightstep/ruby/examples/fork_children', access_token: '{your_access_token}')
@@ -44,26 +41,6 @@ for k in 1..20
     LightStep.enable
     span = LightStep.start_span("my_toggle_span-#{Process.pid}")
     sleep(0.0025 * rand(k))
-    span.finish
-  end
-
-  puts "Parent, pid #{Process.pid}, waiting on child pid #{pid}"
-  Process.wait
-end
-
-# Repeat the test, this time relying on the library to internally detect the fork
-# and reset the reporting state as needed.
-for k in 1..20
-  puts "Implicit reset iteration #{k}..."
-
-  pid = Process.fork do
-    for i in 1..10
-      span = LightStep.start_span("second_forked_span-#{Process.pid}")
-      span.finish
-    end
-  end
-  for i in 1..10
-    span = LightStep.start_span("second_process_span-#{Process.pid}")
     span.finish
   end
 

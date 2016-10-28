@@ -151,6 +151,7 @@ module LightStep
     def disable(discard: false)
       @enabled = false
       @tracer_transport.clear if discard
+      @tracer_transport.flush
     end
 
     def flush

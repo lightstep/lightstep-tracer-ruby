@@ -1,19 +1,17 @@
 require 'spec_helper'
 
-# FIXME(ngauthier@gmail.com) scope leak move into describe
-def init_test_tracer
-  LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', transport: LightStep::Transport::Nil.new)
-end
-
-# FIXME(ngauthier@gmail.com) scope leak move into describe
-def init_callback_tracer(callback)
-  tracer = LightStep::Tracer.new(
-    component_name: 'lightstep/ruby/spec',
-    transport: LightStep::Transport::Callback.new(callback: callback)
-  )
-end
-
 describe LightStep do
+  def init_test_tracer
+    LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', transport: LightStep::Transport::Nil.new)
+  end
+
+  def init_callback_tracer(callback)
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: callback)
+    )
+  end
+
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
     expect(tracer).to be_an_instance_of LightStep::Tracer
@@ -37,8 +35,7 @@ describe LightStep do
 
   it 'should handle 100 spans being created' do
     tracer = init_test_tracer
-    # FIXME(ngauthier@gmail.com) times
-    for i in 0..100
+    100.times do
       span = tracer.start_span('my_span')
       span.finish
     end
@@ -46,8 +43,7 @@ describe LightStep do
 
   it 'should handle 10,000 spans being created' do
     tracer = init_test_tracer
-    # FIXME(ngauthier@gmail.com) times
-    for i in 0..10_000
+    10_000.times do
       span = tracer.start_span('my_span')
       span.finish
     end
@@ -56,8 +52,7 @@ describe LightStep do
   it 'should handle 10,000 logs being created' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    # FIXME(ngauthier@gmail.com) times
-    for i in 0..10_000
+    10_000.times do
       span.log_event 'test log'
     end
     span.finish
@@ -101,9 +96,8 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    # FIXME(ngauthier@gmail.com) times + no _i
-    children1 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent1) }
-    children2 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent2) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', parent: parent1) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', parent: parent2) }
 
     children1.each do |child|
       expect(child.trace_guid).to be_an_instance_of String
@@ -266,12 +260,10 @@ describe LightStep do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })
     parent = tracer.start_span('parent_span')
-    # FIXME(ngauthier@gmail.com) each
     threads = *(1..64).map do |i|
       Thread.new do
         child = tracer.start_span("child_span_#{i}")
-        # FIXME(ngauthier@gmail.com) times
-        for j in 1..10
+        10.times do |j|
           sleep 0.01
           child.log_event('message', j)
         end
@@ -288,30 +280,27 @@ describe LightStep do
 
   it 'should handle concurrent tracers' do
     results = {}
-    # FIXME(ngauthier@gmail.com) times and formatting
-    # FIXME(ngauthier@gmail.com) times refactor with above
     outer_threads = *(1..8).to_a.map do |k|
-                      Thread.new do
-                        tracer = init_callback_tracer(proc { |obj|; results[k] = obj; })
-                        parent = tracer.start_span('parent_span')
-                        threads = *(1..16).map do |i|
-                          Thread.new do
-                            child = tracer.start_span("child_span_#{i}")
-                            for j in 1..10
-                              sleep 0.01
-                              child.log_event('message', j)
-                            end
-                            child.finish
-                          end
-                        end
-                        threads.each(&:join)
-                        parent.finish
+      Thread.new do
+        tracer = init_callback_tracer(proc { |obj|; results[k] = obj; })
+        parent = tracer.start_span('parent_span')
+        threads = *(1..16).map do |i|
+          Thread.new do
+            child = tracer.start_span("child_span_#{i}")
+            for j in 1..10
+              sleep 0.01
+              child.log_event('message', j)
+            end
+            child.finish
+          end
+        end
+        threads.each(&:join)
+        parent.finish
 
-                        tracer.flush
-                      end
-                    end
+        tracer.flush
+      end
+    end
     outer_threads.each(&:join)
-    # FIXME(ngauthier@gmail.com) times
     for i in 1..8
       r = results[i]
       expect(r['span_records'].length).to eq(17)

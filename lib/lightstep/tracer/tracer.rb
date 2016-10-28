@@ -77,34 +77,26 @@ module LightStep
     # ----------------------------------------------------------------------------
 
     # Starts a new span.
-    #
-    # The fields argument is optional. The accepted fields are:
-    #
-    # :parent - parent span object
-    # :tags - map of key-value pairs
-    # :startTime - manually specified start time of the span in milliseconds
-    # :endTime - manually specified end time of the span in milliseconds
-    #
-    # TODO(ngauthier@gmail.com) parent should be child_of according to spec
-    # TODO(ngauthier@gmail.com) support follows_from?
-    # TODO(ngauthier@gmail.com) follows_from and child_of should be `references`
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
-    # TODO(ngauthier@gmail.com) fields should be tags
-    # TODO(ngauthier@gmail.com) ability to provide a timestamp to be used other than now
-    def start_span(operation_name, fields = nil)
-      span = Span.new(self)
-      span.operation_name = operation_name
-      span.start_micros = now_micros
-
-      unless fields.nil?
-        span.set_parent(fields[:parent]) unless fields[:parent].nil?
-        span.set_tags(fields[:tags]) unless fields[:tags].nil?
-        span.start_micros = fields[:startTime] * 1000 unless fields[:startTime].nil?
-        span.end_micros = fields[:endTime] * 1000 unless fields[:endTime].nil?
+    def start_span(operation_name, child_of: nil, start_time: nil, end_time: nil, tags: nil)
+      child_of_guid = nil
+      trace_guid = nil
+      if Span === child_of
+        child_of_guid = child_of.guid
+        trace_guid = child_of.trace_guid
+      else
+        trace_guid = generate_guid
       end
 
-      span.trace_guid = generate_guid if span.trace_guid.nil?
-      span
+      Span.new(
+        tracer: self,
+        operation_name: operation_name,
+        child_of_guid: child_of_guid,
+        trace_guid: trace_guid,
+        start_micros: start_time.nil? ? now_micros : micros(start_time),
+        end_micros: end_time.nil? ? nil : micros(end_time),
+        tags: tags
+      )
     end
 
     def inject(span, format, carrier)
@@ -148,7 +140,7 @@ module LightStep
 
     # Disables the tracer
     # @param discard [Boolean] whether to discard queued data
-    def disable(discard: false)
+    def disable(discard: true)
       @enabled = false
       @tracer_transport.clear if discard
       @tracer_transport.flush
@@ -159,10 +151,10 @@ module LightStep
     end
 
     # Internal use only.
-    def _finish_span(span)
+    def _finish_span(span, end_time: Time.now)
       return unless enabled?
 
-      span.end_micros = now_micros if span.end_micros === 0
+      span.end_micros ||= micros(end_time)
       full = push_with_max(@tracer_span_records, span.to_h, max_span_records)
       @tracer_counters[:dropped_spans] += 1 if full
       flush_if_needed
@@ -296,10 +288,14 @@ module LightStep
     end
 
     def now_micros
-      (Time.now.to_f * 1e6).floor
+      micros(Time.now)
     end
 
     private
+
+    def micros(time)
+      (time.to_f * 1E6).floor
+    end
 
     def inject_to_text_map(span, carrier)
       carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
@@ -312,14 +308,13 @@ module LightStep
     end
 
     def join_from_text_map(operation_name, carrier)
-      span = Span.new(self)
-      span.operation_name = operation_name
-      span.start_micros = now_micros
-
-      parent_guid = carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid']
-      trace_guid = carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid']
-      span.trace_guid = trace_guid
-      span.set_tag(:parent_span_guid, parent_guid)
+      span = Span.new(
+        tracer: self,
+        operation_name: operation_name,
+        start_micros: now_micros,
+        child_of_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'],
+        trace_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'],
+      )
 
       carrier.each do |key, value|
         next unless key.start_with?(CARRIER_BAGGAGE_PREFIX)

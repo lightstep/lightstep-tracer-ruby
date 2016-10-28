@@ -71,26 +71,33 @@ describe LightStep do
   it 'should allow start and end times to be specified explicitly' do
     tracer = init_test_tracer
 
-    span1 = tracer.start_span('test1', startTime: 1000)
+    t1 = Time.now
+    t1_micros = (t1.to_f * 1E6).floor
+    t2 = t1 + 60
+    t2_micros = (t2.to_f * 1E6).floor
+
+    span1 = tracer.start_span('test1', start_time: t1)
     span1.finish
-    expect(span1.start_micros).to eq(1000 * 1000)
+    expect(span1.start_micros).to eq(t1_micros)
 
-    span2 = tracer.start_span('test2', endTime: 54_321)
+    span2 = tracer.start_span('test2', end_time: t1)
     span2.finish
-    expect(span2.end_micros).to eq(54_321 * 1000)
+    expect(span2.end_micros).to eq(t1_micros)
 
-    span3 = tracer.start_span('test3', startTime: 1234, endTime: 5678)
+    span3 = tracer.start_span('test3', start_time: t1, end_time: t2)
     span3.finish
-    expect(span3.start_micros).to eq(1234 * 1000)
-    expect(span3.end_micros).to eq(5678 * 1000)
+    expect(span3.start_micros).to eq(t1_micros)
+    expect(span3.end_micros).to eq(t2_micros)
   end
 
   it 'should allow end time to be specified at finish time' do
     tracer = init_test_tracer
 
+    t1 = Time.now
+    t1_micros = (t1.to_f * 1E6).floor
     span = tracer.start_span('test')
-    span.finish(endTime: 54_321)
-    expect(span.end_micros).to eq(54_321 * 1000)
+    span.finish(end_time: t1)
+    expect(span.end_micros).to eq(t1_micros)
   end
 
   it 'should assign the same trace_guid to child spans as the parent' do
@@ -98,8 +105,8 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    children1 = (1..4).to_a.map { tracer.start_span('child', parent: parent1) }
-    children2 = (1..4).to_a.map { tracer.start_span('child', parent: parent2) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2) }
 
     children1.each do |child|
       expect(child.trace_guid).to be_an_instance_of String
@@ -170,10 +177,10 @@ describe LightStep do
   it 'should handle nested spans' do
     tracer = init_test_tracer
     s0 = tracer.start_span('s0')
-    s1 = tracer.start_span('s1', parent: s0)
-    s2 = tracer.start_span('s2', parent: s1)
-    s3 = tracer.start_span('s3', parent: s2)
-    s4 = tracer.start_span('s4', parent: s3)
+    s1 = tracer.start_span('s1', child_of: s0)
+    s2 = tracer.start_span('s2', child_of: s1)
+    s3 = tracer.start_span('s3', child_of: s2)
+    s4 = tracer.start_span('s4', child_of: s3)
     s4.finish
     s3.finish
     s2.finish
@@ -250,7 +257,7 @@ describe LightStep do
 
     span2 = tracer.join('test_span_2', LightStep.FORMAT_TEXT_MAP, carrier)
     expect(span2.trace_guid).to eq(span1.trace_guid)
-    expect(span2.parent_guid).to eq(span1.guid)
+    expect(span2.tags[:parent_span_guid]).to eq(span1.guid)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')
     expect(span2.get_baggage_item('umbrella')).to eq('golf')
 

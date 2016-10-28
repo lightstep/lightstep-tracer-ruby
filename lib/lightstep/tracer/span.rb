@@ -2,23 +2,41 @@
 # to the spec. Baggage moves to span context.
 module LightStep
   class Span
-    # ----------------------------------------------------------------------------
-    #  OpenTracing API
-    # ----------------------------------------------------------------------------
-
     class UnsupportedValueTypeError < LightStep::Error; end
 
-    attr_reader :tracer
+    attr_reader :guid, :tags, :baggage, :tracer
+    attr_accessor :trace_guid, :operation_name, :start_micros, :end_micros
 
-    # TODO(ngauthier@gmail.com) validate value is string, bool, or number and
-    # remove value.to_s from all calling code
+    def initialize(
+      tracer:,
+      operation_name:,
+      child_of_guid: nil,
+      trace_guid:,
+      start_micros:,
+      end_micros: nil,
+      tags: nil
+    )
+      @tags = Hash(tags)
+      @baggage = {}
+
+      @tracer = tracer
+      @guid = tracer.generate_guid
+      self.operation_name = operation_name
+      self.start_micros = start_micros
+      self.end_micros = end_micros
+      self.trace_guid = trace_guid
+      set_tag(:parent_span_guid, child_of_guid) if !child_of_guid.nil?
+    end
+
+    # TODO(ngauthier@gmail.com) []=
     def set_tag(key, value)
       case value
       when String, Fixnum, TrueClass, FalseClass
         @tags[key] = value
       else
        raise UnsupportedValueTypeError,
-         "Value must be a string, number, or boolean: #{value.inspect} is a #{value.class.name}"
+         "Value must be a string, number, or boolean: "+
+         "#{value.inspect} is a #{value.class.name}"
       end
       self
     end
@@ -47,72 +65,20 @@ module LightStep
       @tracer.raw_log_record(record, fields[:payload])
     end
 
-    def finish(fields = nil)
-      unless fields.nil?
-        self.end_micros = fields[:endTime] * 1000 unless fields[:endTime].nil?
-      end
-      @tracer._finish_span(self)
-      self
-    end
-
-    # ----------------------------------------------------------------------------
-    # Implemenation specific
-    # ----------------------------------------------------------------------------
-
-    def initialize(tracer)
-      @tags = {}
-      @baggage = {}
-
-      @tracer = tracer
-      @guid = tracer.generate_guid
-    end
-
-    attr_reader :guid, :tags, :baggage
-    attr_accessor :trace_guid
-
-    def finalize
-      if @end_micros == 0
-        # TODO: Notify about that finish() was never called for this span
-        finish
-      end
-    end
-
-    attr_writer :start_micros
-    def start_micros
-      @start_micros ||= 0
-    end
-
-    attr_writer :end_micros
-    def end_micros
-      @end_micros ||= 0
-    end
-
-    attr_writer :operation_name
-    def operation_name
-      @operation_name ||= ''
-    end
-
-    def parent_guid
-      @tags[:parent_span_guid]
-    end
-
-    def set_parent(span)
-      set_tag(:parent_span_guid, span.guid)
-      @trace_guid = span.trace_guid
+    def finish(end_time: Time.now)
+      @tracer._finish_span(self, end_time: end_time)
       self
     end
 
     def to_h
-      attributes = @tags.map do |key, value|
-        {"Key" => key.to_s, "Value" => value}
-      end
-
-      rec = {
+      {
         "runtime_guid" => tracer.guid,
         "span_guid" => guid,
         "trace_guid" => trace_guid,
         "span_name" => operation_name,
-        "attributes" => attributes,
+        "attributes" => @tags.map {|key, value|
+          {"Key" => key.to_s, "Value" => value}
+        },
         "oldest_micros" => start_micros,
         "youngest_micros" => end_micros,
         "error_flag" => false

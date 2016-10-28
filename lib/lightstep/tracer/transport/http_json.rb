@@ -3,12 +3,20 @@ require 'lightstep/tracer/transport/base'
 
 module LightStep
   module Transport
+    # HTTPJSON is a transport that sends reports via HTTP in JSON format.
+    # It is thread-safe, however it is *not* fork-safe. When forking, all items
+    # in the queue will be copied and sent in duplicate. Therefore, when forking,
+    # you should first flush the queue with `flush`, then fork, then resume
+    # use of the Tracer.
+    #
+    # You may also simply initialize the tracer after forking, if you are forking
+    # at the beginning of your server to establish worker processes.
     class HTTPJSON < Base
       LIGHTSTEP_HOST = "collector.lightstep.com"
       LIGHTSTEP_PORT = 443
+      QUEUE_SIZE = 16
 
       def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, secure: true, access_token:)
-        # Configuration
         @host = host
         @port = port
         @verbose = verbose
@@ -18,28 +26,13 @@ module LightStep
         raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
         @access_token = access_token
 
-        @thread = nil
-        @thread_pid = 0 # process ID that created the thread
-        @queue = nil
+        start_queue
       end
 
-      def flush_report(report)
-        if report.nil?
-          puts 'Report not set.' if @verbose > 0
-          return nil
-        end
-        puts report.inspect if @verbose >= 3
-
-        _check_process_id
-
-        # Lazily re-create the queue and thread. Closing the transport as well as
-        # a process fork may have reset it to nil.
-        if @thread.nil? || !@thread.alive?
-          @thread_pid = Process.pid
-          @thread = _start_network_thread
-        end
-        @queue = SizedQueue.new(16) if @queue.nil?
-
+      def report(report)
+        p report if @verbose >= 3
+        # TODO(ngauthier@gmail.com): the queue could be full here if we're
+        # lagging, which would cause this to block!
         @queue << {
           host: @host,
           port: @port,
@@ -51,64 +44,37 @@ module LightStep
         nil
       end
 
-      # Process.fork can leave SizedQueue and thread in a untrustworthy state. If the
-      # process ID has changed, reset the the thread and queue.
-      # FIXME(ngauthier@gmail.com) private
-      def _check_process_id
-        if Process.pid != @thread_pid
-          Thread.kill(@thread) unless @thread.nil?
-          @thread = nil
-          @queue = nil
-        end
+      def flush
+        close
+        start_queue
       end
 
-      def close(discardPending)
-        return if @queue.nil?
-        return if @thread.nil?
-
-        _check_process_id
-
-        # Since close can be called at shutdown and there are multiple Ruby
-        # interpreters out there, don't assume the shutdown process will leave the
-        # thread alive or have definitely killed it
-        if !@thread.nil? && @thread.alive?
-          @queue << { signal_exit: true } unless @queue.nil?
-          @thread.join
-        elsif !@queue.empty? && !discardPending
-          begin
-            _post_report(@queue.pop(true))
-          # FIXME(ngauthier@gmail.com) naked rescue
-          rescue
-            # Ignore the error. Make sure this final flush does not percollate an
-            # exception back into the calling code.
-          end
-        end
-
-        # Clear the member variables so the transport is in a known state and can be
-        # restarted safely
-        @queue = nil
-        @thread = nil
+      def clear
+        @queue.clear
       end
 
-      # FIXME(ngauthier@gmail.com) private
+      def close
+        @queue.close
+        @thread.join
+      end
+
+      private
+
+      def start_queue
+        @queue = SizedQueue.new(QUEUE_SIZE)
+        @thread = start_thread(@queue)
+      end
+
       # TODO(ngauthier@gmail.com) abort on exception?
-      # FIXME(ngauthier@gmail.com) plain loop + break
-      def _start_network_thread
+      def start_thread(queue)
         Thread.new do
-          done = false
-          until done
-            params = @queue.pop
-            if params[:signal_exit]
-              done = true
-            else
-              _post_report(params)
-            end
+          while item = queue.pop
+            post_report(item)
           end
         end
       end
 
-      # FIXME(ngauthier@gmail.com) private
-      def _post_report(params)
+      def post_report(params)
         https = Net::HTTP.new(params[:host], params[:port])
         https.use_ssl = params[:secure]
         req = Net::HTTP::Post.new('/api/v0/reports')

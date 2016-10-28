@@ -150,7 +150,7 @@ module LightStep
     # @param discard [Boolean] whether to discard queued data
     def disable(discard: false)
       @enabled = false
-      @tracer_transport.close(discard)
+      @tracer_transport.clear if discard
     end
 
     def flush
@@ -257,7 +257,7 @@ module LightStep
       # (which in turn will send the flushed data over the network).
       at_exit do
         flush
-        @tracer_transport.close(false)
+        @tracer_transport.close
       end
     end
 
@@ -355,7 +355,7 @@ module LightStep
 
       @tracer_last_flush_micros = now
 
-      resp = @tracer_transport.flush_report(report_request)
+      resp = @tracer_transport.report(report_request)
 
       # ALWAYS reset the buffers and update the counters as the RPC response
       # is, by design, not waited for and not reliable.

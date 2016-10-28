@@ -4,11 +4,17 @@ module LightStep
       def initialize
       end
 
-      def flush_report(_report)
+      def report(_report)
         nil
       end
 
-      def close(immediate)
+      def close
+      end
+
+      def clear
+      end
+
+      def flush
       end
     end
   end

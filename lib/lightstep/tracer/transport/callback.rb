@@ -7,12 +7,18 @@ module LightStep
         @callback = callback
       end
 
-      def flush_report(report)
+      def report(report)
         @callback.call(report)
         nil
       end
 
-      def close(immediate)
+      def close
+      end
+
+      def clear
+      end
+
+      def flush
       end
     end
   end

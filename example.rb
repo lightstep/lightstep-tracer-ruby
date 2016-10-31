@@ -14,7 +14,7 @@ thread1 = Thread.new do
   for i in 1..10
     sleep(0.15)
     puts "Logging event #{i}..."
-    span.log_event('hello world', count: i)
+    span.log(event: 'hello world', count: i)
   end
 end
 thread2 = Thread.new do
@@ -23,7 +23,7 @@ thread2 = Thread.new do
     child = LightStep.start_span('my_child', child_of: span)
     sleep(0.1)
     current *= 2
-    child.log_event("2^#{i}", result: current)
+    child.log(event: "2^#{i}", result: current)
     child.finish
   end
 end

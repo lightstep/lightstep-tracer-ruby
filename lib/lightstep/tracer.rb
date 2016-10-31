@@ -166,35 +166,23 @@ module LightStep
 
     # Internal use only
     # @private
-    def raw_log_record(fields, payload)
+    def raw_log_record(timestamp: Time.now, stable_name: nil, span_guid:, fields: {})
       return unless enabled?
 
-      fields['runtime_guid'] = guid
+      record = {
+        runtime_guid: guid,
+        timestamp_micros: micros(timestamp)
+      }
+      record[:stable_name] = stable_name.to_s if !stable_name.nil?
 
-      if fields['timestamp_micros'].nil?
-        fields['timestamp_micros'] = now_micros
+      begin
+        record[:payload_json] = JSON.generate(fields, max_nesting: 8)
+      rescue
+        # TODO: failure to encode a payload as JSON should be recorded in the
+        # internal library logs, with catioun not flooding the internal logs.
       end
 
-      # TODO: data scrubbing and size limiting
-      json = nil
-      case payload
-      when Array, Hash
-        begin
-          fields['payload_json'] = JSON.generate(payload, max_nesting: 8)
-        rescue
-          # TODO(ngauthier@gmail.com) naked rescue
-          # TODO: failure to encode a payload as JSON should be recorded in the
-          # internal library logs, with catioun not flooding the internal logs.
-        end
-      when nil
-        # noop
-      else
-        # TODO: Remove the outer 'payload' key wrapper. Just transport the JSON
-        # Value (Value in the sense of the JSON spec).
-        fields['payload_json'] = JSON.generate(payload: payload)
-      end
-
-      full = push_with_max(@tracer_log_records, fields, max_log_records)
+      full = push_with_max(@tracer_log_records, record, max_log_records)
       @dropped_logs.increment if full
     end
 
@@ -229,13 +217,13 @@ module LightStep
       @tracer_last_flush_micros = start_time
 
       @tracer_thrift_runtime = {
-        'guid' => guid,
-        'start_micros' => start_time,
-        'group_name' => component_name,
-        'attrs' => [
-          {"Key" => "lightstep_tracer_platform", "Value" => "ruby"},
-          {"Key" => "lightstep_tracer_version",  "Value" => LightStep::VERSION},
-          {"Key" => "ruby_version",              "Value" => RUBY_VERSION}
+        guid: guid,
+        start_micros: start_time,
+        group_name: component_name,
+        attrs: [
+          {Key: "lightstep_tracer_platform", Value: "ruby"},
+          {Key: "lightstep_tracer_version",  Value: LightStep::VERSION},
+          {Key: "ruby_version",              Value: RUBY_VERSION}
         ]
       }.freeze
 
@@ -346,14 +334,14 @@ module LightStep
       @dropped_spans.update{|old| dropped_spans = old; 0 }
 
       report_request = {
-        'runtime' => @tracer_thrift_runtime,
-        'oldest_micros' => @tracer_report_start_time.to_i,
-        'youngest_micros' => now.to_i,
-        'log_records' => log_records,
-        'span_records' => span_records,
-        'counters' => [
-            {"Name": "dropped_logs", "Value": dropped_logs},
-            {"Name": "dropped_spans", "Value": dropped_spans},
+        runtime: @tracer_thrift_runtime,
+        oldest_micros: @tracer_report_start_time.to_i,
+        youngest_micros: now.to_i,
+        log_records: log_records,
+        span_records: span_records,
+        counters: [
+            {Name: "dropped_logs",  Value: dropped_logs},
+            {Name: "dropped_spans", Value: dropped_spans},
         ]
       }
 

@@ -12,7 +12,7 @@ LightStep.configure(
 class HelloWorldApp
   def self.call(env)
     span = LightStep.start_span('request')
-    span.log_event 'env', env
+    span.log event: 'env', env: env
     resp = [200, {}, ["Hello World. You said: #{env['QUERY_STRING']}"]]
     span.finish
     resp

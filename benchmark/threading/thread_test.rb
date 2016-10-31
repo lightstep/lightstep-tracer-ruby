@@ -30,7 +30,7 @@ thread = Thread.new do
     start = Time.now
     for i in 1..100
       span = LightStep.start_span('my_span')
-      span.log_event('hello world', count: i)
+      span.log(event: 'hello world', count: i)
       span.finish
       count += 1
     end

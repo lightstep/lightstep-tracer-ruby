@@ -32,7 +32,7 @@ describe LightStep do
     span.set_tag('number', 500)
     span.set_tag('array', [:hello])
     span.set_baggage_item('baggage_key', 'baggage_item')
-    span.log_event('event_name', key: 'value')
+    span.log(event: 'event_name', key: 'value')
     span.finish
   end
 
@@ -56,7 +56,7 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
     10_000.times do
-      span.log_event 'test log'
+      span.log event: 'test log'
     end
     span.finish
   end
@@ -128,7 +128,7 @@ describe LightStep do
 
     (children1.concat children2).each do |child|
       thrift_data = child.to_h
-      expect(thrift_data['trace_guid']).to eq(child.trace_guid)
+      expect(thrift_data[:trace_guid]).to eq(child.trace_guid)
     end
   end
 
@@ -157,7 +157,7 @@ describe LightStep do
       nil::NilClass
     ]
     data.each do |value|
-      span.log_event 'test', value
+      span.log event: 'test', value: value
     end
     span.finish
     file.close
@@ -171,7 +171,7 @@ describe LightStep do
 
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
-    span.log_event 'circular_ref', a
+    span.log event: 'circular_ref', a: a
     span.finish
   end
 
@@ -194,18 +194,18 @@ describe LightStep do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })
     s0 = tracer.start_span('s0')
-    s0.log_event('test_event')
+    s0.log(event: 'test_event')
     s0.finish
     tracer.flush
 
-    expect(result).to include('runtime', 'span_records', 'log_records', 'oldest_micros', 'youngest_micros')
+    expect(result).to include(:runtime, :span_records, :log_records, :oldest_micros, :youngest_micros)
 
-    expect(result['span_records'].length).to eq(1)
-    expect(result['log_records'].length).to eq(1)
-    expect(result['oldest_micros']).to be <= result['youngest_micros']
+    expect(result[:span_records].length).to eq(1)
+    expect(result[:log_records].length).to eq(1)
+    expect(result[:oldest_micros]).to be <= result[:youngest_micros]
 
     # Decompose back into a plain hash
-    runtime_attrs = Hash[result['runtime']['attrs'].map { |a|; [a['Key'], a['Value']]; }]
+    runtime_attrs = Hash[result[:runtime][:attrs].map { |a|; [a[:Key], a[:Value]]; }]
     expect(runtime_attrs).to include('lightstep_tracer_platform', 'lightstep_tracer_version')
     expect(runtime_attrs).to include('ruby_version')
   end
@@ -218,29 +218,20 @@ describe LightStep do
       transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
     )
 
-    single_payload = proc do |payload|
+    single_payload = proc do |fields|
       s0 = tracer.start_span('s0')
-      s0.log_event('test_event', payload)
+      s0.log(event: 'test_event', **fields)
       s0.finish
       tracer.flush
-      JSON.generate(JSON.parse(result['log_records'][0]['payload_json']))
+      JSON.generate(JSON.parse(result[:log_records][0][:payload_json]))
     end
 
     # NOTE: these comparisons rely on Ruby generating a consistent ordering to
     # map keys
 
-    # TODO: these tests are aligned to the current behavior that primitive types
-    # are prefixed with a "payload" key
-    expect(single_payload.call(0)).to eq(JSON.generate(payload: 0))
-    expect(single_payload.call(-1)).to eq(JSON.generate(payload: -1))
-    expect(single_payload.call('test')).to eq(JSON.generate(payload: 'test'))
-    expect(single_payload.call(true)).to eq(JSON.generate(payload: true))
-
-    expect(single_payload.call([])).to eq(JSON.generate([]))
-    expect(single_payload.call([1, 2, 3])).to eq(JSON.generate([1, 2, 3]))
     expect(single_payload.call({})).to eq(JSON.generate({}))
     expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
-    expect(single_payload.call(x: 'y', a: 'b')).to eq(JSON.generate(x: 'y', a: 'b'))
+    expect(single_payload.call(x: 'y', a: 5, true: true)).to eq(JSON.generate(x: 'y', a: 5, true: true))
   end
 
   it 'should handle inject/join for text carriers' do
@@ -275,7 +266,7 @@ describe LightStep do
         child = tracer.start_span("child_span_#{i}")
         10.times do |j|
           sleep 0.01
-          child.log_event('message', j)
+          child.log(j: j)
         end
         child.finish
       end
@@ -284,8 +275,8 @@ describe LightStep do
     parent.finish
     tracer.flush
 
-    expect(result['span_records'].length).to eq(65)
-    expect(result['log_records'].length).to eq(64 * 10)
+    expect(result[:span_records].length).to eq(65)
+    expect(result[:log_records].length).to eq(64 * 10)
   end
 
   it 'should handle concurrent tracers' do
@@ -299,7 +290,7 @@ describe LightStep do
             child = tracer.start_span("child_span_#{i}")
             for j in 1..10
               sleep 0.01
-              child.log_event('message', j)
+              child.log(j: j)
             end
             child.finish
           end
@@ -313,8 +304,8 @@ describe LightStep do
     outer_threads.each(&:join)
     for i in 1..8
       r = results[i]
-      expect(r['span_records'].length).to eq(17)
-      expect(r['log_records'].length).to eq(16 * 10)
+      expect(r[:span_records].length).to eq(17)
+      expect(r[:log_records].length).to eq(16 * 10)
     end
   end
 

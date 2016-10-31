@@ -82,24 +82,17 @@ module LightStep
       @baggage[key]
     end
 
-    # Log an event
-    # @deprecated Use {#log} instead
-    # @param event [String] the name of the event to log
-    # @param payload [Hash] the payload of the log message
-    def log_event(event, payload = nil)
-      log(event: event.to_s, payload: payload)
-    end
-
     # Add a log entry to this span
-    # @param fields [Hash] fields to log.
-    def log(fields)
-      record = { span_guid: @guid }
-
-      record[:stable_name] = fields[:event].to_s unless fields[:event].nil?
-      unless fields[:timestamp].nil?
-        record[:timestamp_micros] = (fields[:timestamp] * 1000).to_i
-      end
-      @tracer.raw_log_record(record, fields[:payload])
+    # @param event [String] event name for the log
+    # @param timestamp [Time] time of the log
+    # @param fields [Hash] Additional information to log
+    def log(event: nil, timestamp: Time.now, **fields)
+      @tracer.raw_log_record(
+        timestamp: timestamp,
+        stable_name: event,
+        span_guid: @guid,
+        fields: fields
+      )
     end
 
     # Finish the {Span}
@@ -112,16 +105,16 @@ module LightStep
     # Hash representation of a span
     def to_h
       {
-        "runtime_guid" => tracer.guid,
-        "span_guid" => guid,
-        "trace_guid" => trace_guid,
-        "span_name" => operation_name,
-        "attributes" => @tags.map {|key, value|
-          {"Key" => key.to_s, "Value" => value}
+        runtime_guid: tracer.guid,
+        span_guid: guid,
+        trace_guid: trace_guid,
+        span_name: operation_name,
+        attributes: @tags.map {|key, value|
+          {Key: key.to_s, Value: value}
         },
-        "oldest_micros" => start_micros,
-        "youngest_micros" => end_micros,
-        "error_flag" => false
+        oldest_micros: start_micros,
+        youngest_micros: end_micros,
+        error_flag: false
       }
     end
   end

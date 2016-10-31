@@ -35,17 +35,17 @@ Benchmark.bm(32) do |x|
 
   x.report('log_event(100)') do
     span = tracer.start_span('my_span')
-    for i in 0..100; span.log_event('event', i); end
+    for i in 0..100; span.log(event: 'event', i: i); end
     span.finish
   end
   x.report('log_event(1000)') do
     span = tracer.start_span('my_span')
-    for i in 0..1000; span.log_event('event', i); end
+    for i in 0..1000; span.log(event: 'event', i: i); end
     span.finish
   end
   x.report('log_event(10000)') do
     span = tracer.start_span('my_span')
-    for i in 0..10_000; span.log_event('event', i); end
+    for i in 0..10_000; span.log(event: 'event', i: i); end
     span.finish
   end
 

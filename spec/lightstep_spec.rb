@@ -198,10 +198,10 @@ describe LightStep do
     s0.finish
     tracer.flush
 
-    expect(result).to include(:runtime, :span_records, :log_records, :oldest_micros, :youngest_micros)
+    expect(result).to include(:runtime, :span_records, :oldest_micros, :youngest_micros)
 
     expect(result[:span_records].length).to eq(1)
-    expect(result[:log_records].length).to eq(1)
+    expect(result[:span_records][0][:log_records].length).to eq(1)
     expect(result[:oldest_micros]).to be <= result[:youngest_micros]
 
     # Decompose back into a plain hash
@@ -223,7 +223,7 @@ describe LightStep do
       s0.log(event: 'test_event', **fields)
       s0.finish
       tracer.flush
-      JSON.generate(JSON.parse(result[:log_records][0][:payload_json]))
+      JSON.generate(JSON.parse(result[:span_records][0][:log_records][0][:payload_json]))
     end
 
     # NOTE: these comparisons rely on Ruby generating a consistent ordering to
@@ -276,7 +276,10 @@ describe LightStep do
     tracer.flush
 
     expect(result[:span_records].length).to eq(65)
-    expect(result[:log_records].length).to eq(64 * 10)
+    result[:span_records].each do |span|
+      expect(span[:log_records].length).to eq(10) unless span[:span_name] == "parent_span"
+    end
+
   end
 
   it 'should handle concurrent tracers' do
@@ -305,7 +308,10 @@ describe LightStep do
     for i in 1..8
       r = results[i]
       expect(r[:span_records].length).to eq(17)
-      expect(r[:log_records].length).to eq(16 * 10)
+      r[:span_records].each do |span|
+        expect(span[:log_records].length).to eq(10) unless span[:span_name] == "parent_span"
+        expect(span[:log_records].length).to eq(0) if span[:span_name] == "parent_span"
+      end
     end
   end
 
@@ -326,5 +332,29 @@ describe LightStep do
     tracer.enable
     tracer.enable
     tracer.enable
+  end
+
+  it 'should report dropped spans and logs' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.max_span_records = 5
+    tracer.max_log_records = 5
+
+    (1..10).map do |i|
+      Thread.new do
+        span = tracer.start_span("span_#{i}")
+        (1..10).map do |j|
+          Thread.new do
+            span.log(j: j)
+          end
+        end.map(&:join)
+        span.finish
+      end
+    end.map(&:join)
+    tracer.flush
+    expect(result[:counters]).to eq([
+      {Name: "dropped_logs", Value: 75},
+      {Name: "dropped_spans", Value: 5}
+    ])
   end
 end

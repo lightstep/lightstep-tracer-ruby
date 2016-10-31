@@ -37,10 +37,14 @@ module LightStep
       child_of_guid: nil,
       trace_guid:,
       start_micros:,
-      tags: nil
+      tags: nil,
+      max_log_records:
     )
       @tags = Concurrent::Hash.new(tags)
       @baggage = Concurrent::Hash.new
+      @log_records = Concurrent::Array.new
+      @dropped_logs = Concurrent::AtomicFixnum.new
+      @max_log_records = max_log_records
 
       @tracer = tracer
       @guid = LightStep.guid
@@ -87,12 +91,26 @@ module LightStep
     # @param timestamp [Time] time of the log
     # @param fields [Hash] Additional information to log
     def log(event: nil, timestamp: Time.now, **fields)
-      @tracer.raw_log_record(
-        timestamp: timestamp,
-        stable_name: event,
-        span_guid: @guid,
-        fields: fields
-      )
+      return unless tracer.enabled?
+
+      record = {
+        runtime_guid: tracer.guid,
+        timestamp_micros: LightStep.micros(timestamp)
+      }
+      record[:stable_name] = event.to_s if !event.nil?
+
+      begin
+        record[:payload_json] = JSON.generate(fields, max_nesting: 8)
+      rescue
+        # TODO: failure to encode a payload as JSON should be recorded in the
+        # internal library logs, with catioun not flooding the internal logs.
+      end
+
+      @log_records.push(record)
+      if @log_records.size > @max_log_records
+        @log_records.shift
+        @dropped_logs.increment
+      end
     end
 
     # Finish the {Span}
@@ -115,8 +133,18 @@ module LightStep
         },
         oldest_micros: start_micros,
         youngest_micros: end_micros,
-        error_flag: false
+        error_flag: false,
+        dropped_logs: dropped_logs_count,
+        log_records: @log_records
       }
+    end
+
+    def dropped_logs_count
+      @dropped_logs.value
+    end
+
+    def logs_count
+      @log_records.size
     end
   end
 end

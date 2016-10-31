@@ -84,7 +84,7 @@ module LightStep
         child_of_guid = child_of.guid
         trace_guid = child_of.trace_guid
       else
-        trace_guid = generate_guid
+        trace_guid = LightStep.guid
       end
 
       Span.new(
@@ -186,13 +186,6 @@ module LightStep
       @dropped_logs.increment if full
     end
 
-    # Returns a random guid. Note: this intentionally does not use SecureRandom,
-    # which is slower and cryptographically secure randomness is not required here.
-    def generate_guid
-      @_rng ||= Random.new
-      @_rng.bytes(8).unpack('H*')[0]
-    end
-
     protected
 
     def access_token=(token)
@@ -212,7 +205,7 @@ module LightStep
       @dropped_spans = Concurrent::AtomicFixnum.new
 
       start_time = LightStep.micros(Time.now)
-      @guid = generate_guid
+      @guid = LightStep.guid
       @report_start_time = start_time
       @last_flush_micros = start_time
 

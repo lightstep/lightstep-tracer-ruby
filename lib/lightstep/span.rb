@@ -43,7 +43,7 @@ module LightStep
       @baggage = Concurrent::Hash.new
 
       @tracer = tracer
-      @guid = tracer.generate_guid
+      @guid = LightStep.guid
       self.operation_name = operation_name
       self.start_micros = start_micros
       self.trace_guid = trace_guid

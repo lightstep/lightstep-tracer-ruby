@@ -15,6 +15,9 @@ module LightStep
       LIGHTSTEP_PORT = 443
       QUEUE_SIZE = 16
 
+      ENCRYPTION_TLS = 'tls'
+      ENCRYPTION_NONE = 'none'
+
       class QueueFullError < LightStep::Error; end
 
       # Initialize the transport
@@ -24,11 +27,11 @@ module LightStep
       # @param secure [Boolean]
       # @param access_token [String] access token for LightStep server
       # @return [HTTPJSON]
-      def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, secure: true, access_token:)
+      def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, encryption: ENCRYPTION_TLS, access_token:)
         @host = host
         @port = port
         @verbose = verbose
-        @secure = secure
+        @encryption = encryption
 
         raise ConfigurationError, "access_token must be a string" unless String === access_token
         raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
@@ -45,7 +48,7 @@ module LightStep
         @queue.push({
           host: @host,
           port: @port,
-          secure: @secure,
+          encryption: @encryption,
           access_token: @access_token,
           content: report,
           verbose: @verbose
@@ -90,7 +93,7 @@ module LightStep
 
       def post_report(params)
         https = Net::HTTP.new(params[:host], params[:port])
-        https.use_ssl = params[:secure]
+        https.use_ssl = params[:encryption] == ENCRYPTION_TLS
         req = Net::HTTP::Post.new('/api/v0/reports')
         req['LightStep-Access-Token'] = params[:access_token]
         req['Content-Type'] = 'application/json'

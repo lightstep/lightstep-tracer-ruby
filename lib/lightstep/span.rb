@@ -5,9 +5,6 @@ module LightStep
   #
   # See http://www.opentracing.io for more information.
   class Span
-    # UnsupportedValueTypeError is raised when a tag value is not a supported type
-    class UnsupportedValueTypeError < LightStep::Error; end
-
     # The guid of the span
     attr_reader :guid
     # Tags on the span
@@ -55,15 +52,14 @@ module LightStep
 
     # Set a tag value on this span
     # @param key [String] the key of the tag
-    # @param value [String, Numeric, Boolean] the value of the tag
+    # @param value [String, Numeric, Boolean] the value of the tag. If it's not
+    # a String, Numeric, or Boolean it will be encoded with to_s
     def set_tag(key, value)
       case value
       when String, Fixnum, TrueClass, FalseClass
         @tags[key] = value
       else
-       raise UnsupportedValueTypeError,
-         "Value must be a string, number, or boolean: "+
-         "#{value.inspect} is a #{value.class.name}"
+        @tags[key] = value.to_s
       end
       self
     end

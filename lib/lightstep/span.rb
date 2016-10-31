@@ -1,5 +1,5 @@
-# TODO(ngauthier@gmail.com) Separate Span and SpanContext under a getter according
-# to the spec. Baggage moves to span context.
+require 'concurrent'
+
 module LightStep
   # Span represents an OpenTracer Span
   #
@@ -42,8 +42,8 @@ module LightStep
       start_micros:,
       tags: nil
     )
-      @tags = Hash(tags)
-      @baggage = {}
+      @tags = Concurrent::Hash.new(tags)
+      @baggage = Concurrent::Hash.new
 
       @tracer = tracer
       @guid = tracer.generate_guid

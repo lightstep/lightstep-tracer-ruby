@@ -17,6 +17,11 @@ module LightStep
   def_delegator :instance, :disable
   def_delegator :instance, :enable
   def_delegator :instance, :flush
+
+  # Convert a time to microseconds
+  def self.micros(time)
+    (time.to_f * 1E6).floor
+  end
 end
 
 require 'lightstep/tracer'

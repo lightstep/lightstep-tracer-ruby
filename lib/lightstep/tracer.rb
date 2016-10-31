@@ -92,7 +92,7 @@ module LightStep
         operation_name: operation_name,
         child_of_guid: child_of_guid,
         trace_guid: trace_guid,
-        start_micros: start_time.nil? ? now_micros : micros(start_time),
+        start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags
       )
     end
@@ -158,7 +158,7 @@ module LightStep
     def _finish_span(span, end_time: Time.now)
       return unless enabled?
 
-      span.end_micros ||= micros(end_time)
+      span.end_micros ||= LightStep.micros(end_time)
       full = push_with_max(@span_records, span.to_h, max_span_records)
       @dropped_spans.increment if full
       flush_if_needed
@@ -171,7 +171,7 @@ module LightStep
 
       record = {
         runtime_guid: guid,
-        timestamp_micros: micros(timestamp)
+        timestamp_micros: LightStep.micros(timestamp)
       }
       record[:stable_name] = stable_name.to_s if !stable_name.nil?
 
@@ -211,7 +211,7 @@ module LightStep
       @dropped_logs = Concurrent::AtomicFixnum.new
       @dropped_spans = Concurrent::AtomicFixnum.new
 
-      start_time = now_micros.to_i
+      start_time = LightStep.micros(Time.now)
       @guid = generate_guid
       @report_start_time = start_time
       @last_flush_micros = start_time
@@ -264,7 +264,7 @@ module LightStep
     def flush_if_needed
       return unless enabled?
 
-      delta = now_micros - @last_flush_micros
+      delta = LightStep.micros(Time.now) - @last_flush_micros
 
       # Set a bound on maximum flush frequency
       return if delta < min_flush_period_micros
@@ -278,15 +278,7 @@ module LightStep
       end
     end
 
-    def now_micros
-      micros(Time.now)
-    end
-
     private
-
-    def micros(time)
-      (time.to_f * 1E6).floor
-    end
 
     def inject_to_text_map(span, carrier)
       carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
@@ -302,7 +294,7 @@ module LightStep
       span = Span.new(
         tracer: self,
         operation_name: operation_name,
-        start_micros: now_micros,
+        start_micros: LightStep.micros(Time.now),
         child_of_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'],
         trace_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'],
       )
@@ -318,7 +310,7 @@ module LightStep
     def _flush_worker
       return unless enabled?
 
-      now = now_micros
+      now = LightStep.micros(Time.now)
 
       # The thrift configuration has not yet been set: allow logs and spans
       # to be buffered in this case, but flushes won't yet be possible.

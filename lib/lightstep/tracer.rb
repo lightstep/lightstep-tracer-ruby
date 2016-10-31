@@ -156,7 +156,7 @@ module LightStep
 
     # Internal use only.
     # @private
-    def _finish_span(span)
+    def finish_span(span)
       return unless enabled?
       @span_records.push(span.to_h)
       if @span_records.size > max_span_records

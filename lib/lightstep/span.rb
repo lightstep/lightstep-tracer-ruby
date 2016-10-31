@@ -5,23 +5,9 @@ module LightStep
   #
   # See http://www.opentracing.io for more information.
   class Span
-    # The guid of the span
-    attr_reader :guid
-    # Tags on the span
-    attr_reader :tags
-    # The baggage attached to this span
-    attr_reader :baggage
-    # The {Tracer} that created this span
-    attr_reader :tracer
-
-    # The guid of the current trace
-    attr_accessor :trace_guid
-    # The operation name
-    attr_accessor :operation_name
-    # Start time of the span in microseconds
-    attr_accessor :start_micros
-    # End time of the span in microseconds
-    attr_accessor :end_micros
+    # Internal use only
+    # @private
+    attr_reader :guid, :trace_guid, :start_micros, :end_micros, :baggage, :tags
 
     # Creates a new {Span}
     #
@@ -61,9 +47,9 @@ module LightStep
     def set_tag(key, value)
       case value
       when String, Fixnum, TrueClass, FalseClass
-        @tags[key] = value
+        tags[key] = value
       else
-        @tags[key] = value.to_s
+        tags[key] = value.to_s
       end
       self
     end
@@ -75,7 +61,7 @@ module LightStep
     # @param key [String] the key of the baggage item
     # @param value [String] the value of the baggage item
     def set_baggage_item(key, value)
-      @baggage[key] = value
+      baggage[key] = value
       self
     end
 
@@ -83,7 +69,7 @@ module LightStep
     # @param key [String] the key of the baggage item
     # @return Value of the baggage item
     def get_baggage_item(key)
-      @baggage[key]
+      baggage[key]
     end
 
     # Add a log entry to this span
@@ -106,18 +92,20 @@ module LightStep
         # internal library logs, with catioun not flooding the internal logs.
       end
 
-      @log_records.push(record)
-      if @log_records.size > @max_log_records
-        @log_records.shift
-        @dropped_logs.increment
+      log_records.push(record)
+      if log_records.size > @max_log_records
+        log_records.shift
+        dropped_logs.increment
       end
     end
 
     # Finish the {Span}
     # @param end_time [Time] custom end time, if not now
     def finish(end_time: Time.now)
-      self.end_micros ||= LightStep.micros(end_time)
-      @tracer._finish_span(self)
+      if end_micros.nil?
+        self.end_micros = LightStep.micros(end_time)
+      end
+      tracer.finish_span(self)
       self
     end
 
@@ -128,23 +116,33 @@ module LightStep
         span_guid: guid,
         trace_guid: trace_guid,
         span_name: operation_name,
-        attributes: @tags.map {|key, value|
+        attributes: tags.map {|key, value|
           {Key: key.to_s, Value: value}
         },
         oldest_micros: start_micros,
         youngest_micros: end_micros,
         error_flag: false,
         dropped_logs: dropped_logs_count,
-        log_records: @log_records
+        log_records: log_records
       }
     end
 
+    # Internal use only
+    # @private
     def dropped_logs_count
-      @dropped_logs.value
+      dropped_logs.value
     end
 
+    # Internal use only
+    # @private
     def logs_count
-      @log_records.size
+      log_records.size
     end
+
+    private
+
+    attr_reader :tracer, :dropped_logs, :log_records
+    attr_writer :guid, :trace_guid, :start_micros, :end_micros
+    attr_accessor :operation_name
   end
 end

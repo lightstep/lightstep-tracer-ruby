@@ -98,7 +98,8 @@ module LightStep
     # Finish the {Span}
     # @param end_time [Time] custom end time, if not now
     def finish(end_time: Time.now)
-      @tracer._finish_span(self, end_time: end_time)
+      self.end_micros ||= LightStep.micros(end_time)
+      @tracer._finish_span(self)
       self
     end
 

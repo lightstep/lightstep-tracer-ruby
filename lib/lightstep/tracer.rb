@@ -1,5 +1,6 @@
 require 'json'
 require 'concurrent'
+require 'concurrent/channel'
 
 require 'lightstep/span'
 require 'lightstep/transport/http_json'
@@ -155,12 +156,9 @@ module LightStep
 
     # Internal use only.
     # @private
-    def _finish_span(span, end_time: Time.now)
+    def _finish_span(span)
       return unless enabled?
-
-      span.end_micros ||= LightStep.micros(end_time)
-      full = push_with_max(@span_records, span.to_h, max_span_records)
-      @dropped_spans.increment if full
+      @dropped_spans.increment if @span_records.put(span.to_h)
       flush_if_needed
     end
 
@@ -200,7 +198,7 @@ module LightStep
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
       @log_records = Concurrent::Array.new
-      @span_records = Concurrent::Array.new
+      @span_records = Concurrent::Channel::Buffer::Sliding.new(max_span_records)
       @dropped_logs = Concurrent::AtomicFixnum.new
       @dropped_spans = Concurrent::AtomicFixnum.new
 
@@ -266,7 +264,7 @@ module LightStep
       # Set a bound of minimum flush frequency
       if delta > max_flush_period_micros ||
          @log_records.length >= max_log_records / 2 ||
-         @span_records.length >= max_span_records / 2
+         @span_records.size >= max_span_records / 2
         flush
       end
     end
@@ -311,8 +309,14 @@ module LightStep
 
       return if @log_records.empty? && @span_records.empty?
 
+      span_records = []
+      loop do
+        span = @span_records.poll
+        break if span == Concurrent::NULL
+        span_records.push(span)
+      end
+
       log_records = @log_records.slice!(0, @log_records.length)
-      span_records = @span_records.slice!(0, @span_records.length)
       dropped_logs = 0
       dropped_spans = 0
       @dropped_logs.update{|old| dropped_logs = old; 0 }

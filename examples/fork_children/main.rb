@@ -3,7 +3,7 @@
 # disabled before the fork and reenabled afterward.
 
 require 'bundler/setup'
-require 'lightstep-tracer'
+require 'lightstep'
 
 LightStep.configure(
   component_name: 'lightstep/ruby/examples/fork_children',

@@ -1,10 +1,10 @@
-require 'bundler'
-require 'lightstep-tracer'
+require 'bundler/setup'
+require 'lightstep'
 
 require 'rack'
 require 'rack/server'
 
-LightStep.init_global_tracer(
+LightStep.configure(
   component_name: 'lightstep/ruby/examples/rack',
   access_token: '{your_access_token}'
 )

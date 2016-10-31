@@ -2,7 +2,7 @@ require 'benchmark'
 require 'securerandom'
 
 require 'bundler/setup'
-require 'lightstep-tracer'
+require 'lightstep'
 
 rng = Random.new
 

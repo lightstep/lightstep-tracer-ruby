@@ -1,10 +1,10 @@
 require 'json'
 require 'concurrent'
 
-require 'lightstep/tracer/span'
-require 'lightstep/tracer/transport/http_json'
-require 'lightstep/tracer/transport/nil'
-require 'lightstep/tracer/transport/callback'
+require 'lightstep/span'
+require 'lightstep/transport/http_json'
+require 'lightstep/transport/nil'
+require 'lightstep/transport/callback'
 
 module LightStep
   class Tracer
@@ -234,7 +234,7 @@ module LightStep
         'group_name' => component_name,
         'attrs' => [
           {"Key" => "lightstep_tracer_platform", "Value" => "ruby"},
-          {"Key" => "lightstep_tracer_version",  "Value" => LightStep::Tracer::VERSION},
+          {"Key" => "lightstep_tracer_version",  "Value" => LightStep::VERSION},
           {"Key" => "ruby_version",              "Value" => RUBY_VERSION}
         ]
       }.freeze

@@ -134,7 +134,7 @@ describe LightStep do
   it 'should handle all valid payloads types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
-    file = File.open('./lib/lightstep-tracer.rb', 'r')
+    file = File.open('./lib/lightstep.rb', 'r')
     data = [
       nil,
       TRUE, FALSE,

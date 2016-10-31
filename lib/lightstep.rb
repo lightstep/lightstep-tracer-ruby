@@ -19,5 +19,5 @@ module LightStep
   def_delegator :instance, :flush
 end
 
-require 'lightstep/tracer/tracer'
-require 'lightstep/tracer/global_tracer'
+require 'lightstep/tracer'
+require 'lightstep/global_tracer'

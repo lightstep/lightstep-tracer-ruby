@@ -1,11 +1,11 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'lightstep/tracer/version'
+require 'lightstep/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = 'lightstep-tracer'
-  spec.version       = LightStep::Tracer::VERSION
+  spec.name          = 'lightstep'
+  spec.version       = LightStep::VERSION
   spec.authors       = ['bcronin']
   spec.email         = ['support@lightstep.com']
 
@@ -18,6 +18,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'concurrent-ruby', '~> 1.0.0'
   spec.add_development_dependency 'rake', '~> 10.0'
+  spec.add_development_dependency 'rack', '~> 2.0.0'
   spec.add_development_dependency 'rspec', '~> 3.0'
   spec.add_development_dependency 'bump', '~> 0.5'
   spec.add_development_dependency 'simplecov', '~> 0.12.0'

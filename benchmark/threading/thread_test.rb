@@ -1,5 +1,5 @@
 require 'bundler/setup'
-require 'lightstep-tracer'
+require 'lightstep'
 
 LightStep.configure(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
 

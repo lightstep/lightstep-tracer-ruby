@@ -1,5 +1,5 @@
 require 'net/http'
-require 'lightstep/tracer/transport/base'
+require 'lightstep/transport/base'
 
 module LightStep
   module Transport

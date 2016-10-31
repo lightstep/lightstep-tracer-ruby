@@ -206,8 +206,8 @@ describe LightStep do
 
     # Decompose back into a plain hash
     runtime_attrs = Hash[result[:runtime][:attrs].map { |a|; [a[:Key], a[:Value]]; }]
-    expect(runtime_attrs).to include('lightstep_tracer_platform', 'lightstep_tracer_version')
-    expect(runtime_attrs).to include('ruby_version')
+    expect(runtime_attrs).to include('lightstep.tracer_platform', 'lightstep.tracer_version')
+    expect(runtime_attrs).to include('lightstep.tracer_platform_version')
   end
 
   it 'should report payloads correctly' do

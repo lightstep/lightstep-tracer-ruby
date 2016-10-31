@@ -144,8 +144,8 @@ module LightStep
     # @param discard [Boolean] whether to discard queued data
     def disable(discard: true)
       @enabled = false
-      @tracer_transport.clear if discard
-      @tracer_transport.flush
+      @transport.clear if discard
+      @transport.flush
     end
 
     # Flush to the Transport
@@ -159,7 +159,7 @@ module LightStep
       return unless enabled?
 
       span.end_micros ||= micros(end_time)
-      full = push_with_max(@tracer_span_records, span.to_h, max_span_records)
+      full = push_with_max(@span_records, span.to_h, max_span_records)
       @dropped_spans.increment if full
       flush_if_needed
     end
@@ -182,7 +182,7 @@ module LightStep
         # internal library logs, with catioun not flooding the internal logs.
       end
 
-      full = push_with_max(@tracer_log_records, record, max_log_records)
+      full = push_with_max(@log_records, record, max_log_records)
       @dropped_logs.increment if full
     end
 
@@ -206,24 +206,24 @@ module LightStep
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      @tracer_log_records = Concurrent::Array.new
-      @tracer_span_records = Concurrent::Array.new
+      @log_records = Concurrent::Array.new
+      @span_records = Concurrent::Array.new
       @dropped_logs = Concurrent::AtomicFixnum.new
       @dropped_spans = Concurrent::AtomicFixnum.new
 
       start_time = now_micros.to_i
       @guid = generate_guid
-      @tracer_report_start_time = start_time
-      @tracer_last_flush_micros = start_time
+      @report_start_time = start_time
+      @last_flush_micros = start_time
 
-      @tracer_thrift_runtime = {
+      @runtime = {
         guid: guid,
         start_micros: start_time,
         group_name: component_name,
         attrs: [
-          {Key: "lightstep_tracer_platform", Value: "ruby"},
-          {Key: "lightstep_tracer_version",  Value: LightStep::VERSION},
-          {Key: "ruby_version",              Value: RUBY_VERSION}
+          {Key: "lightstep.tracer_platform",         Value: "ruby"},
+          {Key: "lightstep.tracer_version",          Value: LightStep::VERSION},
+          {Key: "lightstep.tracer_platform_version", Value: RUBY_VERSION}
         ]
       }.freeze
 
@@ -231,19 +231,19 @@ module LightStep
         if !(LightStep::Transport::Base === transport)
           raise ConfigurationError, "transport is not a LightStep transport class: #{transport}"
         end
-        @tracer_transport = transport
+        @transport = transport
       else
         if access_token.nil?
           raise ConfigurationError, "you must provide an access token or a transport"
         end
-        @tracer_transport = Transport::HTTPJSON.new(access_token: access_token)
+        @transport = Transport::HTTPJSON.new(access_token: access_token)
       end
 
       # At exit, flush this objects data to the transport and close the transport
       # (which in turn will send the flushed data over the network).
       at_exit do
         flush
-        @tracer_transport.close
+        @transport.close
       end
     end
 
@@ -264,7 +264,7 @@ module LightStep
     def flush_if_needed
       return unless enabled?
 
-      delta = now_micros - @tracer_last_flush_micros
+      delta = now_micros - @last_flush_micros
 
       # Set a bound on maximum flush frequency
       return if delta < min_flush_period_micros
@@ -272,8 +272,8 @@ module LightStep
       # Look for a trigger that a flush is warranted
       # Set a bound of minimum flush frequency
       if delta > max_flush_period_micros ||
-         @tracer_log_records.length >= max_log_records / 2 ||
-         @tracer_span_records.length >= max_span_records / 2
+         @log_records.length >= max_log_records / 2 ||
+         @span_records.length >= max_span_records / 2
         flush
       end
     end
@@ -322,20 +322,20 @@ module LightStep
 
       # The thrift configuration has not yet been set: allow logs and spans
       # to be buffered in this case, but flushes won't yet be possible.
-      return if @tracer_thrift_runtime.nil?
+      return if @runtime.nil?
 
-      return if @tracer_log_records.empty? && @tracer_span_records.empty?
+      return if @log_records.empty? && @span_records.empty?
 
-      log_records = @tracer_log_records.slice!(0, @tracer_log_records.length)
-      span_records = @tracer_span_records.slice!(0, @tracer_span_records.length)
+      log_records = @log_records.slice!(0, @log_records.length)
+      span_records = @span_records.slice!(0, @span_records.length)
       dropped_logs = 0
       dropped_spans = 0
       @dropped_logs.update{|old| dropped_logs = old; 0 }
       @dropped_spans.update{|old| dropped_spans = old; 0 }
 
       report_request = {
-        runtime: @tracer_thrift_runtime,
-        oldest_micros: @tracer_report_start_time.to_i,
+        runtime: @runtime,
+        oldest_micros: @report_start_time.to_i,
         youngest_micros: now.to_i,
         log_records: log_records,
         span_records: span_records,
@@ -345,11 +345,11 @@ module LightStep
         ]
       }
 
-      @tracer_last_flush_micros = now
-      @tracer_report_start_time = now
+      @last_flush_micros = now
+      @report_start_time = now
 
       begin
-        @tracer_transport.report(report_request)
+        @transport.report(report_request)
       rescue LightStep::Transport::HTTPJSON::QueueFullError
         # If the queue is full, add the previous dropped logs to the logs
         # that were going to get reported, as well as the previous dropped

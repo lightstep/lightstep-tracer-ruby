@@ -4,7 +4,7 @@ build:
 	gem build lightstep-tracer.gemspec
 
 test:
-	rake spec
+	bundle exec rake spec
 	ruby example.rb
 	ruby examples/fork_children/main.rb
 

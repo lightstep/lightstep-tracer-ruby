@@ -10,3 +10,4 @@ coverage/
 *~
 Gemfile.lock
 lightstep-tracer*.gem
+lightstep*.gem

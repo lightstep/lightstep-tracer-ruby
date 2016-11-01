@@ -1,7 +1,7 @@
 .PHONY: build test benchmark publish
 
 build:
-	gem build lightstep-tracer.gemspec
+	gem build lightstep.gemspec
 
 test:
 	bundle exec rake spec
@@ -18,4 +18,4 @@ publish: build test benchmark
 	git tag `ruby scripts/version.rb`
 	git push
 	git push --tags
-	gem push lightstep-tracer-`ruby scripts/version.rb`.gem
+	gem push lightstep-`ruby scripts/version.rb`.gem

@@ -8,7 +8,7 @@ The LightStep distributed tracing library for Ruby.
 
 Add this line to your application's Gemfile:
 
-    gem 'lightstep-tracer'
+    gem 'lightstep'
 
 
 And then execute:
@@ -17,19 +17,19 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install lightstep-tracer
+    $ gem install lightstep
 
 
 ## Getting started
 
-    require 'lightstep-tracer'
+    require 'lightstep'
 
     # Initialize the singleton tracer
     LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token')
 
     # Create a basic span and attach a log to the span
     span = LightStep.start_span('my_span')
-    span.log_event('hello world', 'count' => 42)
+    span.log(event: 'hello world', count: 42)
 
     # Create a child span (and add some artificial delays to illustrate the timing)
     sleep(0.1)

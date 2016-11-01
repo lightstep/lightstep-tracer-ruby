@@ -1,7 +1,7 @@
-require_relative '../../lib/lightstep-tracer.rb'
-require 'thread'
+require 'bundler/setup'
+require 'lightstep'
 
-LightStep.init_global_tracer('lightstep/ruby/example', '{your_access_token}')
+LightStep.configure(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
 
 puts 'Starting...'
 
@@ -30,7 +30,7 @@ thread = Thread.new do
     start = Time.now
     for i in 1..100
       span = LightStep.start_span('my_span')
-      span.log_event('hello world', count: i)
+      span.log(event: 'hello world', count: i)
       span.finish
       count += 1
     end

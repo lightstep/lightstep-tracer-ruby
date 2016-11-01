@@ -1,14 +1,18 @@
-require_relative '../../lib/lightstep-tracer.rb'
+require 'bundler/setup'
+require 'lightstep'
 
 require 'rack'
 require 'rack/server'
 
-LightStep.init_global_tracer('lightstep/ruby/examples/rack', '{your_access_token}')
+LightStep.configure(
+  component_name: 'lightstep/ruby/examples/rack',
+  access_token: '{your_access_token}'
+)
 
 class HelloWorldApp
   def self.call(env)
     span = LightStep.start_span('request')
-    span.log_event 'env', env
+    span.log event: 'env', env: env
     resp = [200, {}, ["Hello World. You said: #{env['QUERY_STRING']}"]]
     span.finish
     resp

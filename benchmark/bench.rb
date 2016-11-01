@@ -1,12 +1,16 @@
 require 'benchmark'
 require 'securerandom'
 
-require_relative '../lib/lightstep-tracer.rb'
+require 'bundler/setup'
+require 'lightstep'
 
 rng = Random.new
 
 # Run a quick profile on logging lots of spans
-tracer = LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}', transport: 'nil')
+tracer = LightStep::Tracer.new(
+  component_name: 'lightstep/ruby/spec',
+  transport: LightStep::Transport::Nil.new
+)
 
 Benchmark.bm(32) do |x|
   x.report('Random.bytes.unpack') do
@@ -31,17 +35,17 @@ Benchmark.bm(32) do |x|
 
   x.report('log_event(100)') do
     span = tracer.start_span('my_span')
-    for i in 0..100; span.log_event('event', i); end
+    for i in 0..100; span.log(event: 'event', i: i); end
     span.finish
   end
   x.report('log_event(1000)') do
     span = tracer.start_span('my_span')
-    for i in 0..1000; span.log_event('event', i); end
+    for i in 0..1000; span.log(event: 'event', i: i); end
     span.finish
   end
   x.report('log_event(10000)') do
     span = tracer.start_span('my_span')
-    for i in 0..10_000; span.log_event('event', i); end
+    for i in 0..10_000; span.log(event: 'event', i: i); end
     span.finish
   end
 
@@ -49,7 +53,7 @@ Benchmark.bm(32) do |x|
     span = tracer.start_span('my_span')
     for i in 0..10_000
       carrier = {}
-      tracer.inject(span, LightStep.FORMAT_TEXT_MAP, carrier)
+      tracer.inject(span, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
      end
     span.finish
   end

@@ -1,5 +1,5 @@
 lib = File.expand_path('../../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'lightstep/tracer/version'
+require 'lightstep/version'
 
-print Lightstep::Tracer::VERSION
+print LightStep::VERSION

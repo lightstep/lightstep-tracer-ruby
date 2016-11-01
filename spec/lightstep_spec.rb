@@ -1,27 +1,26 @@
-require 'pp'
-require_relative '../lib/lightstep-tracer.rb'
-
-def init_test_tracer
-  LightStep.init_new_tracer('lightstep/ruby/spec', '{your_access_token}', transport: 'nil')
-end
-
-def init_callback_tracer(callback)
-  tracer = LightStep.init_new_tracer(
-    'lightstep/ruby/spec', '{your_access_token}',
-    transport: 'callback',
-    transport_callback: callback)
-end
+require 'spec_helper'
 
 describe LightStep do
+  def init_test_tracer
+    LightStep::Tracer.new(component_name: 'lightstep/ruby/spec', transport: LightStep::Transport::Nil.new)
+  end
+
+  def init_callback_tracer(callback)
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: callback)
+    )
+  end
+
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
-    expect(tracer).to be_an_instance_of ClientTracer
+    expect(tracer).to be_an_instance_of LightStep::Tracer
   end
 
   it 'should return a valid span from start_span' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    expect(span).to be_an_instance_of ClientSpan
+    expect(span).to be_an_instance_of LightStep::Span
     span.finish
   end
 
@@ -29,14 +28,17 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
     span.set_tag('key', 'value')
+    span.set_tag('bool', true)
+    span.set_tag('number', 500)
+    span.set_tag('array', [:hello])
     span.set_baggage_item('baggage_key', 'baggage_item')
-    span.log_event('event_name', key: 'value')
+    span.log(event: 'event_name', key: 'value')
     span.finish
   end
 
   it 'should handle 100 spans being created' do
     tracer = init_test_tracer
-    for i in 0..100
+    100.times do
       span = tracer.start_span('my_span')
       span.finish
     end
@@ -44,7 +46,7 @@ describe LightStep do
 
   it 'should handle 10,000 spans being created' do
     tracer = init_test_tracer
-    for i in 0..10_000
+    10_000.times do
       span = tracer.start_span('my_span')
       span.finish
     end
@@ -53,8 +55,8 @@ describe LightStep do
   it 'should handle 10,000 logs being created' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    for i in 0..10_000
-      span.log_event 'test log'
+    10_000.times do
+      span.log event: 'test log'
     end
     span.finish
   end
@@ -70,26 +72,33 @@ describe LightStep do
   it 'should allow start and end times to be specified explicitly' do
     tracer = init_test_tracer
 
-    span1 = tracer.start_span('test1', startTime: 1000)
+    t1 = Time.now
+    t1_micros = (t1.to_f * 1E6).floor
+    t2 = t1 + 60
+    t2_micros = (t2.to_f * 1E6).floor
+
+    span1 = tracer.start_span('test1', start_time: t1)
     span1.finish
-    expect(span1.start_micros).to eq(1000 * 1000)
+    expect(span1.start_micros).to eq(t1_micros)
 
-    span2 = tracer.start_span('test2', endTime: 54_321)
-    span2.finish
-    expect(span2.end_micros).to eq(54_321 * 1000)
+    span2 = tracer.start_span('test2')
+    span2.finish(end_time: t1)
+    expect(span2.end_micros).to eq(t1_micros)
 
-    span3 = tracer.start_span('test3', startTime: 1234, endTime: 5678)
-    span3.finish
-    expect(span3.start_micros).to eq(1234 * 1000)
-    expect(span3.end_micros).to eq(5678 * 1000)
+    span3 = tracer.start_span('test3', start_time: t1)
+    span3.finish(end_time: t2)
+    expect(span3.start_micros).to eq(t1_micros)
+    expect(span3.end_micros).to eq(t2_micros)
   end
 
   it 'should allow end time to be specified at finish time' do
     tracer = init_test_tracer
 
+    t1 = Time.now
+    t1_micros = (t1.to_f * 1E6).floor
     span = tracer.start_span('test')
-    span.finish(endTime: 54_321)
-    expect(span.end_micros).to eq(54_321 * 1000)
+    span.finish(end_time: t1)
+    expect(span.end_micros).to eq(t1_micros)
   end
 
   it 'should assign the same trace_guid to child spans as the parent' do
@@ -97,8 +106,8 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    children1 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent1) }
-    children2 = (1..4).to_a.map { |_i| tracer.start_span('child', parent: parent2) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2) }
 
     children1.each do |child|
       expect(child.trace_guid).to be_an_instance_of String
@@ -118,15 +127,15 @@ describe LightStep do
     parent2.finish
 
     (children1.concat children2).each do |child|
-      thrift_data = child.to_thrift
-      expect(thrift_data.trace_guid).to eq(child.trace_guid)
+      thrift_data = child.to_h
+      expect(thrift_data[:trace_guid]).to eq(child.trace_guid)
     end
   end
 
   it 'should handle all valid payloads types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
-    file = File.open('./lib/lightstep-tracer.rb', 'r')
+    file = File.open('./lib/lightstep.rb', 'r')
     data = [
       nil,
       TRUE, FALSE,
@@ -148,7 +157,7 @@ describe LightStep do
       nil::NilClass
     ]
     data.each do |value|
-      span.log_event 'test', value
+      span.log event: 'test', value: value
     end
     span.finish
     file.close
@@ -162,17 +171,17 @@ describe LightStep do
 
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
-    span.log_event 'circular_ref', a
+    span.log event: 'circular_ref', a: a
     span.finish
   end
 
   it 'should handle nested spans' do
     tracer = init_test_tracer
     s0 = tracer.start_span('s0')
-    s1 = tracer.start_span('s1', parent: s0)
-    s2 = tracer.start_span('s2', parent: s1)
-    s3 = tracer.start_span('s3', parent: s2)
-    s4 = tracer.start_span('s4', parent: s3)
+    s1 = tracer.start_span('s1', child_of: s0)
+    s2 = tracer.start_span('s2', child_of: s1)
+    s3 = tracer.start_span('s3', child_of: s2)
+    s4 = tracer.start_span('s4', child_of: s3)
     s4.finish
     s3.finish
     s2.finish
@@ -185,53 +194,44 @@ describe LightStep do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })
     s0 = tracer.start_span('s0')
-    s0.log_event('test_event')
+    s0.log(event: 'test_event')
     s0.finish
     tracer.flush
 
-    expect(result).to include('runtime', 'span_records', 'log_records', 'oldest_micros', 'youngest_micros')
+    expect(result).to include(:runtime, :span_records, :oldest_micros, :youngest_micros)
 
-    expect(result['span_records'].length).to eq(1)
-    expect(result['log_records'].length).to eq(1)
-    expect(result['oldest_micros']).to be <= result['youngest_micros']
+    expect(result[:span_records].length).to eq(1)
+    expect(result[:span_records][0][:log_records].length).to eq(1)
+    expect(result[:oldest_micros]).to be <= result[:youngest_micros]
 
     # Decompose back into a plain hash
-    runtime_attrs = Hash[result['runtime']['attrs'].map { |a|; [a['Key'], a['Value']]; }]
-    expect(runtime_attrs).to include('lightstep_tracer_platform', 'lightstep_tracer_version')
-    expect(runtime_attrs).to include('ruby_version')
+    runtime_attrs = Hash[result[:runtime][:attrs].map { |a|; [a[:Key], a[:Value]]; }]
+    expect(runtime_attrs).to include('lightstep.tracer_platform', 'lightstep.tracer_version')
+    expect(runtime_attrs).to include('lightstep.tracer_platform_version')
   end
 
   it 'should report payloads correctly' do
     # "Report" to an object so we can examine the result
     result = nil
-    tracer = LightStep.init_new_tracer(
-      'lightstep/ruby/spec', '{your_access_token}',
-      transport: 'callback',
-      transport_callback: proc { |obj|; result = obj; })
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
+    )
 
-    single_payload = proc do |payload|
+    single_payload = proc do |fields|
       s0 = tracer.start_span('s0')
-      s0.log_event('test_event', payload)
+      s0.log(event: 'test_event', **fields)
       s0.finish
       tracer.flush
-      JSON.generate(JSON.parse(result['log_records'][0]['payload_json']))
+      JSON.generate(JSON.parse(result[:span_records][0][:log_records][0][:payload_json]))
     end
 
     # NOTE: these comparisons rely on Ruby generating a consistent ordering to
     # map keys
 
-    # TODO: these tests are aligned to the current behavior that primitive types
-    # are prefixed with a "payload" key
-    expect(single_payload.call(0)).to eq(JSON.generate(payload: 0))
-    expect(single_payload.call(-1)).to eq(JSON.generate(payload: -1))
-    expect(single_payload.call('test')).to eq(JSON.generate(payload: 'test'))
-    expect(single_payload.call(true)).to eq(JSON.generate(payload: true))
-
-    expect(single_payload.call([])).to eq(JSON.generate([]))
-    expect(single_payload.call([1, 2, 3])).to eq(JSON.generate([1, 2, 3]))
     expect(single_payload.call({})).to eq(JSON.generate({}))
     expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
-    expect(single_payload.call(x: 'y', a: 'b')).to eq(JSON.generate(x: 'y', a: 'b'))
+    expect(single_payload.call(x: 'y', a: 5, true: true)).to eq(JSON.generate(x: 'y', a: 5, true: true))
   end
 
   it 'should handle inject/join for text carriers' do
@@ -241,15 +241,15 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1, LightStep.FORMAT_TEXT_MAP, carrier)
+    tracer.inject(span1, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.trace_guid)
     expect(carrier['ot-tracer-spanid']).to eq(span1.guid)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
-    span2 = tracer.join('test_span_2', LightStep.FORMAT_TEXT_MAP, carrier)
+    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
     expect(span2.trace_guid).to eq(span1.trace_guid)
-    expect(span2.parent_guid).to eq(span1.guid)
+    expect(span2.tags[:parent_span_guid]).to eq(span1.guid)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')
     expect(span2.get_baggage_item('umbrella')).to eq('golf')
 
@@ -264,9 +264,9 @@ describe LightStep do
     threads = *(1..64).map do |i|
       Thread.new do
         child = tracer.start_span("child_span_#{i}")
-        for j in 1..10
+        10.times do |j|
           sleep 0.01
-          child.log_event('message', j)
+          child.log(j: j)
         end
         child.finish
       end
@@ -275,37 +275,43 @@ describe LightStep do
     parent.finish
     tracer.flush
 
-    expect(result['span_records'].length).to eq(65)
-    expect(result['log_records'].length).to eq(64 * 10)
+    expect(result[:span_records].length).to eq(65)
+    result[:span_records].each do |span|
+      expect(span[:log_records].length).to eq(10) unless span[:span_name] == "parent_span"
+    end
+
   end
 
   it 'should handle concurrent tracers' do
     results = {}
     outer_threads = *(1..8).to_a.map do |k|
-                      Thread.new do
-                        tracer = init_callback_tracer(proc { |obj|; results[k] = obj; })
-                        parent = tracer.start_span('parent_span')
-                        threads = *(1..16).map do |i|
-                          Thread.new do
-                            child = tracer.start_span("child_span_#{i}")
-                            for j in 1..10
-                              sleep 0.01
-                              child.log_event('message', j)
-                            end
-                            child.finish
-                          end
-                        end
-                        threads.each(&:join)
-                        parent.finish
+      Thread.new do
+        tracer = init_callback_tracer(proc { |obj|; results[k] = obj; })
+        parent = tracer.start_span('parent_span')
+        threads = *(1..16).map do |i|
+          Thread.new do
+            child = tracer.start_span("child_span_#{i}")
+            for j in 1..10
+              sleep 0.01
+              child.log(j: j)
+            end
+            child.finish
+          end
+        end
+        threads.each(&:join)
+        parent.finish
 
-                        tracer.flush
-                      end
-                    end
+        tracer.flush
+      end
+    end
     outer_threads.each(&:join)
     for i in 1..8
       r = results[i]
-      expect(r['span_records'].length).to eq(17)
-      expect(r['log_records'].length).to eq(16 * 10)
+      expect(r[:span_records].length).to eq(17)
+      r[:span_records].each do |span|
+        expect(span[:log_records].length).to eq(10) unless span[:span_name] == "parent_span"
+        expect(span[:log_records].length).to eq(0) if span[:span_name] == "parent_span"
+      end
     end
   end
 
@@ -326,5 +332,29 @@ describe LightStep do
     tracer.enable
     tracer.enable
     tracer.enable
+  end
+
+  it 'should report dropped spans and logs' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.max_span_records = 5
+    tracer.max_log_records = 5
+
+    (1..10).map do |i|
+      Thread.new do
+        span = tracer.start_span("span_#{i}")
+        (1..10).map do |j|
+          Thread.new do
+            span.log(j: j)
+          end
+        end.map(&:join)
+        span.finish
+      end
+    end.map(&:join)
+    tracer.flush
+    expect(result[:counters]).to eq([
+      {Name: "dropped_logs", Value: 75},
+      {Name: "dropped_spans", Value: 5}
+    ])
   end
 end

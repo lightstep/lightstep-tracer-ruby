@@ -1,7 +1,7 @@
 .PHONY: build test benchmark publish
 
 build:
-	gem build lightstep-tracer.gemspec
+	gem build lightstep.gemspec
 
 test:
 	bundle exec rake spec
@@ -12,10 +12,12 @@ benchmark:
 	ruby benchmark/bench.rb
 	ruby benchmark/threading/thread_test.rb
 
-publish: build test benchmark
+bump-version:
 	ruby -e 'require "bump"; Bump::Bump.run("patch")'
 	make build	# rebuild after version increment
 	git tag `ruby scripts/version.rb`
 	git push
 	git push --tags
-	gem push lightstep-tracer-`ruby scripts/version.rb`.gem
+
+publish: build test benchmark bump-version
+	gem push lightstep-`ruby scripts/version.rb`.gem

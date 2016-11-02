@@ -53,12 +53,12 @@ module LightStep
       @max_span_records = [MIN_MAX_SPAN_RECORDS, max].max
     end
 
-    def min_flush_period_micros
-      @min_flush_period_micros ||= DEFAULT_MIN_REPORTING_PERIOD_SECS * 1E6
+    def min_reporting_period_micros
+      @min_reporting_period_micros ||= DEFAULT_MIN_REPORTING_PERIOD_SECS * 1E6
     end
 
-    def max_flush_period_micros
-      @max_flush_period_micros ||= DEFAULT_MAX_REPORTING_PERIOD_SECS * 1E6
+    def max_reporting_period_micros
+      @max_reporting_period_micros ||= DEFAULT_MAX_REPORTING_PERIOD_SECS * 1E6
     end
 
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
@@ -217,9 +217,9 @@ module LightStep
       return unless enabled?
 
       delta = LightStep.micros(Time.now) - @last_flush_micros
-      return if delta < min_flush_period_micros
+      return if delta < min_reporting_period_micros
 
-      if delta > max_flush_period_micros || @span_records.size >= max_span_records / 2
+      if delta > max_reporting_period_micros || @span_records.size >= max_span_records / 2
         flush
       end
     end

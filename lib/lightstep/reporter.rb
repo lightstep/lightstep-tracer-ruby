@@ -1,14 +1,3 @@
-# Things that will be copied to report:
-# * min/max span records
-# * min/max reporting period
-#
-# Things that move to report:
-# * flushing (finish span just delegates to the reporter)
-# * report runtime data
-# * report timings
-# * at_exit closes the reporter
-# * flush_worker stuff
-
 module LightStep
   # Reporter builds up reports of spans and flushes them to a transport
   class Reporter
@@ -41,7 +30,6 @@ module LightStep
       # (which in turn will send the flushed data over the network).
       at_exit do
         flush
-        @transport.close
       end
     end
 
@@ -67,8 +55,8 @@ module LightStep
         youngest_micros: now,
         span_records: span_records,
         counters: [
-            {Name: "dropped_logs",  Value: dropped_logs},
-            {Name: "dropped_spans", Value: dropped_spans},
+          {Name: "dropped_logs",  Value: dropped_logs},
+          {Name: "dropped_spans", Value: dropped_spans},
         ]
       }
 
@@ -97,7 +85,13 @@ module LightStep
     end
 
     def clear
-      @transport.clear
+      @dropped_spans.increment(@span_records.size)
+      @dropped_span_logs.increment(
+        @span_records.reduce(0) {|memo, span|
+          memo + span[:log_records].size + span[:dropped_logs]
+        }
+      )
+      @span_records.clear
     end
 
     private

@@ -334,6 +334,22 @@ describe LightStep do
     tracer.enable
   end
 
+  it 'should not be enabled after disabling' do
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.disable
+    expect(tracer).not_to be_enabled
+  end
+
+  it 'should not report spans when disabled' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.disable
+    Timecop.freeze(Time.now + 5 * 60) do
+      tracer.start_span('span').finish
+    end
+    expect(result).to be_nil
+  end
+
   it 'should report dropped spans and logs' do
     result = nil
     tracer = init_callback_tracer(proc { |obj| result = obj })

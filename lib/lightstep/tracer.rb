@@ -133,7 +133,8 @@ module LightStep
 
     # @return true if the tracer is enabled
     def enabled?
-      @enabled ||= true
+      return @enabled if defined?(@enabled)
+      @enabled = true
     end
 
     # Enables the tracer

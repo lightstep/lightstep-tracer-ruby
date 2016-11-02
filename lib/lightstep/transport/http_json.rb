@@ -24,7 +24,7 @@ module LightStep
       # @param host [String] host of the domain to the endpoind to push data
       # @param port [Numeric] port on which to connect
       # @param verbose [Numeric] verbosity level. Right now 0-3 are supported
-      # @param secure [Boolean]
+      # @param encryption [ENCRYPTION_TLS, ENCRYPTION_NONE] kind of encryption to use
       # @param access_token [String] access token for LightStep server
       # @return [HTTPJSON]
       def initialize(host: LIGHTSTEP_HOST, port: LIGHTSTEP_PORT, verbose: 0, encryption: ENCRYPTION_TLS, access_token:)

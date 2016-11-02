@@ -14,7 +14,7 @@ module LightStep
 
     # Configure the GlobalTracer
     # See {LightStep::Tracer#initialize}
-    def configure(opts = nil)
+    def configure(**options)
       raise ConfigurationError, 'Already configured' if configured
       self.configured = true
       super

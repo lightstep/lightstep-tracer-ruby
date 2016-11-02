@@ -57,16 +57,8 @@ module LightStep
       @min_flush_period_micros ||= DEFAULT_MIN_REPORTING_PERIOD_SECS * 1E6
     end
 
-    def min_reporting_period_secs=(secs)
-      @min_flush_period_micros = [DEFAULT_MIN_REPORTING_PERIOD_SECS, secs].max * 1E6
-    end
-
     def max_flush_period_micros
       @max_flush_period_micros ||= DEFAULT_MAX_REPORTING_PERIOD_SECS * 1E6
-    end
-
-    def max_reporting_period_secs=(secs)
-      @max_flush_period_micros = [DEFAULT_MAX_REPORTING_PERIOD_SECS, secs].min * 1E6
     end
 
     # TODO(ngauthier@gmail.com) inherit SpanContext from references

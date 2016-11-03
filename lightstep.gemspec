@@ -17,6 +17,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   spec.add_dependency 'concurrent-ruby', '~> 1.0'
+  spec.add_dependency 'concurrent-ruby-edge', '= 0.2.2'
   spec.add_development_dependency 'rake', '~> 11.3'
   spec.add_development_dependency 'rack', '~> 2.0'
   spec.add_development_dependency 'rspec', '~> 3.0'

@@ -11,15 +11,6 @@ module LightStep
         @callback.call(report)
         nil
       end
-
-      def close
-      end
-
-      def clear
-      end
-
-      def flush
-      end
     end
   end
 end

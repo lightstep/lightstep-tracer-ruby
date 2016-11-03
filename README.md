@@ -45,9 +45,9 @@ The LightStep Tracer is threadsafe. For increased performance, you can add the
 `concurrent-ruby-ext` gem to your Gemfile. This will enable C extensions for
 concurrent operations.
 
-**The LightStep Tracer is not inherently Fork-safe**. When forking, you should
-`disable` the Tracer before forking, then `enable` it in the child Process
-and parent Process after forking. See the `fork_children` example for more.
+The LightStep Tracer is also Fork-safe. When forking, the child process will
+not inherit the unflushed spans of the parent, so they will only be flushed
+once.
 
 ## Development
 

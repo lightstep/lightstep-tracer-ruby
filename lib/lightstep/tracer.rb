@@ -2,6 +2,7 @@ require 'json'
 require 'concurrent'
 
 require 'lightstep/span'
+require 'lightstep/reporter'
 require 'lightstep/transport/http_json'
 require 'lightstep/transport/nil'
 require 'lightstep/transport/callback'
@@ -10,16 +11,6 @@ module LightStep
   class Tracer
     FORMAT_TEXT_MAP = 1
     FORMAT_BINARY = 2
-
-    CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
-    CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
-
-    DEFAULT_MAX_LOG_RECORDS = 1000
-    MIN_MAX_LOG_RECORDS = 1
-    DEFAULT_MAX_SPAN_RECORDS = 1000
-    MIN_MAX_SPAN_RECORDS = 1
-    DEFAULT_MIN_REPORTING_PERIOD_SECS = 1.5
-    DEFAULT_MAX_REPORTING_PERIOD_SECS = 30.0
 
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
@@ -51,14 +42,7 @@ module LightStep
 
     def max_span_records=(max)
       @max_span_records = [MIN_MAX_SPAN_RECORDS, max].max
-    end
-
-    def min_reporting_period_micros
-      @min_reporting_period_micros ||= DEFAULT_MIN_REPORTING_PERIOD_SECS * 1E6
-    end
-
-    def max_reporting_period_micros
-      @max_reporting_period_micros ||= DEFAULT_MAX_REPORTING_PERIOD_SECS * 1E6
+      @reporter.max_span_records = @max_span_records
     end
 
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
@@ -138,93 +122,50 @@ module LightStep
     # @param discard [Boolean] whether to discard queued data
     def disable(discard: true)
       @enabled = false
-      @transport.clear if discard
-      @transport.flush
+      @reporter.clear if discard
+      @reporter.flush
     end
 
     # Flush to the Transport
     def flush
-      _flush_worker
+      return unless enabled?
+      @reporter.flush
     end
 
     # Internal use only.
     # @private
     def finish_span(span)
       return unless enabled?
-      @span_records.push(span.to_h)
-      if @span_records.size > max_span_records
-        @span_records.shift
-        @dropped_spans.increment
-        @dropped_span_logs.increment(span.logs_count + span.dropped_logs_count)
-      end
-      flush_if_needed
+      @reporter.add_span(span)
     end
 
     protected
-
-    def access_token=(token)
-      if !access_token.nil?
-        raise ConfigurationError, "access token cannot be changed"
-      end
-      @access_token = token
-    end
 
     def configure(component_name:, access_token: nil, transport: nil)
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      @span_records = Concurrent::Array.new
-      @dropped_spans = Concurrent::AtomicFixnum.new
-      @dropped_span_logs = Concurrent::AtomicFixnum.new
+      transport = Transport::HTTPJSON.new(access_token: access_token) if !access_token.nil?
+      raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
+      raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
 
-      start_time = LightStep.micros(Time.now)
-      @guid = LightStep.guid
-      @report_start_time = start_time
-      @last_flush_micros = start_time
-
-      @runtime = {
+      @reporter = LightStep::Reporter.new(
+        max_span_records: max_span_records,
+        transport: transport,
         guid: guid,
-        start_micros: start_time,
-        group_name: component_name,
-        attrs: [
-          {Key: "lightstep.tracer_platform",         Value: "ruby"},
-          {Key: "lightstep.tracer_version",          Value: LightStep::VERSION},
-          {Key: "lightstep.tracer_platform_version", Value: RUBY_VERSION}
-        ]
-      }.freeze
-
-      if !transport.nil?
-        if !(LightStep::Transport::Base === transport)
-          raise ConfigurationError, "transport is not a LightStep transport class: #{transport}"
-        end
-        @transport = transport
-      else
-        if access_token.nil?
-          raise ConfigurationError, "you must provide an access token or a transport"
-        end
-        @transport = Transport::HTTPJSON.new(access_token: access_token)
-      end
-
-      # At exit, flush this objects data to the transport and close the transport
-      # (which in turn will send the flushed data over the network).
-      at_exit do
-        flush
-        @transport.close
-      end
-    end
-
-    def flush_if_needed
-      return unless enabled?
-
-      delta = LightStep.micros(Time.now) - @last_flush_micros
-      return if delta < min_reporting_period_micros
-
-      if delta > max_reporting_period_micros || @span_records.size >= max_span_records / 2
-        flush
-      end
+        component_name: component_name
+      )
     end
 
     private
+
+    CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
+    CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
+
+    DEFAULT_MAX_LOG_RECORDS = 1000
+    MIN_MAX_LOG_RECORDS = 1
+    DEFAULT_MAX_SPAN_RECORDS = 1000
+    MIN_MAX_SPAN_RECORDS = 1
 
     def inject_to_text_map(span, carrier)
       carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
@@ -252,51 +193,6 @@ module LightStep
         span.set_baggage_item(plain_key, value)
       end
       span
-    end
-
-    def _flush_worker
-      return unless enabled?
-      # The thrift configuration has not yet been set: allow logs and spans
-      # to be buffered in this case, but flushes won't yet be possible.
-      return if @runtime.nil?
-      return if @span_records.empty?
-
-      now = LightStep.micros(Time.now)
-
-      span_records = @span_records.slice!(0, @span_records.length)
-      dropped_spans = 0
-      @dropped_spans.update{|old| dropped_spans = old; 0 }
-
-      old_dropped_span_logs = 0
-      @dropped_span_logs.update{|old| old_dropped_span_logs = old; 0 }
-      dropped_logs = old_dropped_span_logs
-      dropped_logs = span_records.reduce(dropped_logs) do |memo, span|
-        memo += span.delete :dropped_logs
-      end
-
-      report_request = {
-        runtime: @runtime,
-        oldest_micros: @report_start_time,
-        youngest_micros: now,
-        span_records: span_records,
-        counters: [
-            {Name: "dropped_logs",  Value: dropped_logs},
-            {Name: "dropped_spans", Value: dropped_spans},
-        ]
-      }
-
-      @last_flush_micros = now
-      @report_start_time = now
-
-      begin
-        @transport.report(report_request)
-      rescue LightStep::Transport::HTTPJSON::QueueFullError
-        # If the queue is full, add the previous dropped logs to the logs
-        # that were going to get reported, as well as the previous dropped
-        # spans and spans that would have been recorded
-        @dropped_spans.increment(dropped_spans + span_records.length)
-        @dropped_span_logs.increment(old_dropped_span_logs)
-      end
     end
   end
 end

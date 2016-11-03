@@ -14,6 +14,7 @@ module LightStep
       LIGHTSTEP_HOST = "collector.lightstep.com"
       LIGHTSTEP_PORT = 443
       QUEUE_SIZE = 16
+      STOP = :stop
 
       ENCRYPTION_TLS = 'tls'
       ENCRYPTION_NONE = 'none'
@@ -43,8 +44,9 @@ module LightStep
       # Queue a report for sending
       def report(report)
         p report if @verbose >= 3
-        # TODO(ngauthier@gmail.com): the queue could be full here if we're
-        # lagging, which would cause this to block!
+        if @queue.size >= QUEUE_SIZE
+          raise QueueFullError
+        end
         @queue.push({
           host: @host,
           port: @port,
@@ -52,10 +54,8 @@ module LightStep
           access_token: @access_token,
           content: report,
           verbose: @verbose
-        }, true)
+        })
         nil
-      rescue ThreadError
-        raise QueueFullError
       end
 
       # Flush the current queue
@@ -71,14 +71,15 @@ module LightStep
 
       # Close the transport. No further data can be sent!
       def close
-        @queue.close
+        clear
+        @queue.push(STOP)
         @thread.join
       end
 
       private
 
       def start_queue
-        @queue = SizedQueue.new(QUEUE_SIZE)
+        @queue = Queue.new
         @thread = start_thread(@queue)
       end
 
@@ -86,7 +87,11 @@ module LightStep
       def start_thread(queue)
         Thread.new do
           while item = queue.pop
-            post_report(item)
+            if item == STOP
+              break
+            else
+              post_report(item)
+            end
           end
         end
       end

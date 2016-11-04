@@ -19,6 +19,7 @@ puts 'Starting...'
       sleep(0.0025 * rand(k))
       span.finish
     end
+    LightStep.flush
   end
 
   10.times do
@@ -47,3 +48,5 @@ puts 'Starting...'
 end
 
 puts 'Done!'
+
+LightStep.flush

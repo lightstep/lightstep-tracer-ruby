@@ -29,6 +29,6 @@ thread2 = Thread.new do
 end
 [thread1, thread2].each(&:join)
 span.finish
-
+LightStep.flush
 puts 'Done!'
 puts "https://app.lightstep.com/#{access_token}/trace?span_guid=#{span.guid}&at_micros=#{span.start_micros}"

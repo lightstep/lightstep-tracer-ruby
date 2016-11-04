@@ -24,6 +24,15 @@ describe LightStep do
     span.finish
   end
 
+  it 'should allow operation_name updates' do
+    tracer = init_test_tracer
+    span = tracer.start_span('original')
+    expect(span.operation_name).to eq('original')
+    span.operation_name = 'updated'
+    expect(span.operation_name).to eq('updated')
+    span.finish
+  end
+
   it 'should allow support all the OpenTracing span APIs' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')

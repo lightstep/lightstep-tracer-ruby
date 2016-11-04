@@ -26,7 +26,8 @@ module LightStep
       tags: nil,
       max_log_records:
     )
-      @tags = Concurrent::Hash.new(tags)
+      @tags = Concurrent::Hash.new
+      @tags.update(tags) unless tags.nil?
       @baggage = Concurrent::Hash.new
       @log_records = Concurrent::Array.new
       @dropped_logs = Concurrent::AtomicFixnum.new

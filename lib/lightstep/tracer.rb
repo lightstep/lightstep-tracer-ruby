@@ -45,6 +45,8 @@ module LightStep
       @reporter.max_span_records = @max_span_records
     end
 
+    # Set the report flushing period. If set to 0, no flushing will be done, you
+    # must manually call flush.
     def report_period_seconds=(seconds)
       @reporter.period = seconds
     end

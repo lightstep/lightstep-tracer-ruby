@@ -51,3 +51,4 @@ mutex.unlock
 watchThread.join
 
 puts 'Done!'
+LightStep.flush

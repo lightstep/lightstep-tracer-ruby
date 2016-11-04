@@ -28,10 +28,6 @@ module LightStep
       }.freeze
 
       reset_on_fork
-
-      at_exit do
-        flush
-      end
     end
 
     def add_span(span)

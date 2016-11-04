@@ -122,7 +122,6 @@ module LightStep
             flush
           end
         rescue => ex
-          p ex
           # TODO: internally log the exception
         end
       end

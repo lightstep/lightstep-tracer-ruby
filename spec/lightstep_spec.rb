@@ -373,4 +373,29 @@ describe LightStep do
       {Name: "dropped_spans", Value: 5}
     ])
   end
+
+  it 'should have a String guid' do
+    tracer = init_test_tracer
+    expect(tracer.guid).to be_a(String)
+  end
+
+  it 'should include the tracer guid in the reported runtime' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.start_span('span').finish
+    tracer.flush
+
+    expect(result).to be_a(Hash)
+    expect(result[:runtime][:guid]).to eq(tracer.guid)
+  end
+
+  it 'should include the tracer guid in reported spans' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.start_span('span').finish
+    tracer.flush
+
+    expect(result).to be_a(Hash)
+    expect(result[:span_records].first[:runtime_guid]).to eq(tracer.guid)
+  end
 end

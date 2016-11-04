@@ -5,9 +5,12 @@ module LightStep
   #
   # See http://www.opentracing.io for more information.
   class Span
+    # Part of the OpenTracing API
+    attr_writer :operation_name
+
     # Internal use only
     # @private
-    attr_reader :guid, :trace_guid, :start_micros, :end_micros, :baggage, :tags
+    attr_reader :guid, :trace_guid, :start_micros, :end_micros, :baggage, :tags, :operation_name
 
     # Creates a new {Span}
     #
@@ -144,6 +147,5 @@ module LightStep
 
     attr_reader :tracer, :dropped_logs, :log_records
     attr_writer :guid, :trace_guid, :start_micros, :end_micros
-    attr_accessor :operation_name
   end
 end

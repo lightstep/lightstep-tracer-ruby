@@ -13,7 +13,6 @@ module LightStep
       @transport = transport
 
       start_time = LightStep.micros(Time.now)
-      @guid = LightStep.guid
       @report_start_time = start_time
 
       @runtime = {

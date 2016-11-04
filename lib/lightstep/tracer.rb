@@ -45,6 +45,10 @@ module LightStep
       @reporter.max_span_records = @max_span_records
     end
 
+    def report_period_seconds=(seconds)
+      @reporter.period = seconds
+    end
+
     # TODO(ngauthier@gmail.com) inherit SpanContext from references
 
     # Starts a new span.

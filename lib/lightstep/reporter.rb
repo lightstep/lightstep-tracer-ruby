@@ -1,9 +1,9 @@
-require 'concurrent/channel'
-
 module LightStep
   # Reporter builds up reports of spans and flushes them to a transport
   class Reporter
+    DEFAULT_PERIOD_SECONDS = 3.0
     attr_accessor :max_span_records
+    attr_accessor :period
 
     def initialize(max_span_records:, transport:, guid:, component_name:)
       @max_span_records = max_span_records
@@ -11,6 +11,7 @@ module LightStep
       @dropped_spans = Concurrent::AtomicFixnum.new
       @dropped_span_logs = Concurrent::AtomicFixnum.new
       @transport = transport
+      @period = DEFAULT_PERIOD_SECONDS
 
       start_time = LightStep.micros(Time.now)
       @report_start_time = start_time
@@ -29,8 +30,7 @@ module LightStep
       reset_on_fork
 
       at_exit do
-        @quit_signal << true
-        @thread.join
+        flush
       end
     end
 
@@ -43,11 +43,11 @@ module LightStep
         @dropped_spans.increment
         @dropped_span_logs.increment(dropped[:log_records].size + dropped[:dropped_logs])
       end
-
-      @span_signal << true
     end
 
     def clear
+      reset_on_fork
+
       span_records = @span_records.slice!(0, @span_records.length)
       @dropped_spans.increment(span_records.size)
       @dropped_span_logs.increment(
@@ -58,32 +58,8 @@ module LightStep
     end
 
     def flush
-      @flush_signal << true
-      ~@flush_response_signal
-    end
-
-    private
-    MIN_PERIOD_SECS = 1.5
-    MAX_PERIOD_SECS = 30.0
-
-    # When the process forks, reset the child. All data that was copied will be handled
-    # by the parent. Also, restart the thread since forking killed it
-    def reset_on_fork
-      if @pid != $$
-        @pid = $$
-        @span_signal = Concurrent::Channel.new(buffer: :dropping, capacity: 1)
-        @quit_signal = Concurrent::Channel.new(buffer: :dropping, capacity: 1)
-        @flush_signal = Concurrent::Channel.new
-        @flush_response_signal = Concurrent::Channel.new
-        @span_records.clear
-        @dropped_spans.value = 0
-        @dropped_span_logs.value = 0
-        report_spans
-      end
-    end
-
-    def perform_flush
       reset_on_fork
+
       return if @span_records.empty?
 
       now = LightStep.micros(Time.now)
@@ -123,40 +99,30 @@ module LightStep
       end
     end
 
+    private
+
+    # When the process forks, reset the child. All data that was copied will be handled
+    # by the parent. Also, restart the thread since forking killed it
+    def reset_on_fork
+      if @pid != $$
+        @pid = $$
+        @span_records.clear
+        @dropped_spans.value = 0
+        @dropped_span_logs.value = 0
+        report_spans
+      end
+    end
+
     def report_spans
-      @thread = Thread.new do
+      return if @period <= 0
+      Thread.new do
         begin
           loop do
-            min_reached = false
-            max_reached = false
-            min_timer = Concurrent::Channel.timer(MIN_PERIOD_SECS)
-            max_timer = Concurrent::Channel.timer(MAX_PERIOD_SECS)
-            loop do
-              Concurrent::Channel.select do |s|
-                s.take(@span_signal) do
-                  # we'll check span count below
-                end
-                s.take(min_timer) do
-                  min_reached = true
-                end
-                s.take(max_timer) do
-                  max_reached = true
-                end
-                s.take(@quit_signal) do
-                  perform_flush
-                  Thread.exit
-                end
-                s.take(@flush_signal) do
-                  perform_flush
-                  @flush_response_signal << true
-                end
-              end
-              if max_reached || (min_reached && @span_records.size >= max_span_records / 2)
-                perform_flush
-              end
-            end
+            sleep(@period)
+            flush
           end
         rescue => ex
+          p ex
           # TODO: internally log the exception
         end
       end

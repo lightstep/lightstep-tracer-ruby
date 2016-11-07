@@ -45,6 +45,14 @@ describe LightStep do
     span.finish
   end
 
+  it 'should not allow SpanContext modification' do
+    tracer = init_test_tracer
+    span = tracer.start_span('my_span')
+    expect{span.baggage['foo'] = 'bar'}.to raise_error(RuntimeError)
+    expect{span.id.slice!(0,1)}.to raise_error(RuntimeError)
+    expect{span.trace_id.slice!(0,1)}.to raise_error(RuntimeError)
+  end
+
   it 'should allow tag-setting at start_span time' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span', tags: {'start_key' => 'start_val'})
@@ -83,7 +91,7 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
 
-    expect(span.guid).to be_an_instance_of String
+    expect(span.id).to be_an_instance_of String
     span.finish
   end
 
@@ -128,15 +136,15 @@ describe LightStep do
     children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2) }
 
     children1.each do |child|
-      expect(child.trace_guid).to be_an_instance_of String
-      expect(child.trace_guid).to eq(parent1.trace_guid)
-      expect(child.trace_guid).not_to eq(parent2.trace_guid)
+      expect(child.trace_id).to be_an_instance_of String
+      expect(child.trace_id).to eq(parent1.trace_id)
+      expect(child.trace_id).not_to eq(parent2.trace_id)
     end
 
     children2.each do |child|
-      expect(child.trace_guid).to be_an_instance_of String
-      expect(child.trace_guid).to eq(parent2.trace_guid)
-      expect(child.trace_guid).not_to eq(parent1.trace_guid)
+      expect(child.trace_id).to be_an_instance_of String
+      expect(child.trace_id).to eq(parent2.trace_id)
+      expect(child.trace_id).not_to eq(parent1.trace_id)
     end
 
     children1.each(&:finish)
@@ -146,7 +154,7 @@ describe LightStep do
 
     (children1.concat children2).each do |child|
       thrift_data = child.to_h
-      expect(thrift_data[:trace_guid]).to eq(child.trace_guid)
+      expect(thrift_data[:trace_guid]).to eq(child.trace_id)
     end
   end
 
@@ -260,14 +268,14 @@ describe LightStep do
 
     carrier = {}
     tracer.inject(span1, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.trace_guid)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.guid)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
     span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
-    expect(span2.trace_guid).to eq(span1.trace_guid)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.guid)
+    expect(span2.trace_id).to eq(span1.trace_id)
+    expect(span2.tags[:parent_span_guid]).to eq(span1.id)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')
     expect(span2.get_baggage_item('umbrella')).to eq('golf')
 

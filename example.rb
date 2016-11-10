@@ -31,4 +31,4 @@ end
 span.finish
 LightStep.flush
 puts 'Done!'
-puts "https://app.lightstep.com/#{access_token}/trace?span_guid=#{span.guid}&at_micros=#{span.start_micros}"
+puts "https://app.lightstep.com/#{access_token}/trace?span_guid=#{span.span_context.id}&at_micros=#{span.start_micros}"

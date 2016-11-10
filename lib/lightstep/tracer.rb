@@ -60,24 +60,30 @@ module LightStep
     # @param tags [Hash] tags for the span
     # @return [Span]
     def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
-      child_of_guid = nil
-      trace_guid = nil
+      child_of_id = nil
+      trace_id = nil
       if Span === child_of
-        child_of_guid = child_of.guid
-        trace_guid = child_of.trace_guid
+        child_of_id = child_of.span_context.id
+        trace_id = child_of.span_context.trace_id
       else
-        trace_guid = LightStep.guid
+        trace_id = LightStep.guid
       end
 
-      Span.new(
+      span = Span.new(
         tracer: self,
         operation_name: operation_name,
-        child_of_guid: child_of_guid,
-        trace_guid: trace_guid,
+        child_of_id: child_of_id,
+        trace_id: trace_id,
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
         max_log_records: max_log_records
       )
+
+      if Span === child_of
+        span.set_baggage(child_of.baggage)
+      end
+
+      span
     end
 
     # Inject a span into the given carrier
@@ -176,11 +182,11 @@ module LightStep
     MIN_MAX_SPAN_RECORDS = 1
 
     def inject_to_text_map(span, carrier)
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.guid
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_guid unless span.trace_guid.nil?
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
       carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
-      span.baggage.each do |key, value|
+      span.span_context.baggage.each do |key, value|
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
     end
@@ -190,16 +196,21 @@ module LightStep
         tracer: self,
         operation_name: operation_name,
         start_micros: LightStep.micros(Time.now),
-        child_of_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'],
-        trace_guid: carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'],
+        child_of_id: carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'],
+        trace_id: carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'],
         max_log_records: max_log_records
       )
 
-      carrier.each do |key, value|
-        next unless key.start_with?(CARRIER_BAGGAGE_PREFIX)
-        plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
-        span.set_baggage_item(plain_key, value)
+      baggage = carrier.reduce({}) do |baggage, tuple|
+        key, value = tuple
+        if key.start_with?(CARRIER_BAGGAGE_PREFIX)
+          plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
+          baggage[plain_key] = value
+        end
+        baggage
       end
+      span.set_baggage(baggage)
+
       span
     end
   end

@@ -292,21 +292,21 @@ describe LightStep do
     span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
 
     carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_HTTP, carrier)
-    expect(carrier['OT_TRACER_TRACEID']).to eq(span1.trace_id)
-    expect(carrier['OT_TRACER_SPANID']).to eq(span1.id)
-    expect(carrier['OT_BAGGAGE_FOOTWEAR']).to eq('cleats')
-    expect(carrier['OT_BAGGAGE_UMBRELLA']).to eq('golf')
-    expect(carrier['OT_BAGGAGE_UNSAFEHEADER']).to eq('value')
+    tracer.inject(span1, LightStep::Tracer::FORMAT_HTTP_HEADERS, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
+    expect(carrier['ot-baggage-footwear']).to eq('cleats')
+    expect(carrier['ot-baggage-umbrella']).to eq('golf')
+    expect(carrier['ot-baggage-unsafeheader']).to eq('value')
 
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_HTTP, carrier)
-    expect(span2.trace_id).to eq(span1.trace_id)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.id)
+    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_HTTP_HEADERS, carrier)
+    expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
+    expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')
     expect(span2.get_baggage_item('umbrella')).to eq('golf')
 
-    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_HTTP, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span3.trace_id).to eq('abc123')
+    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_HTTP_HEADERS, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
+    expect(span3.span_context.trace_id).to eq('abc123')
 
     span1.finish
     span2.finish

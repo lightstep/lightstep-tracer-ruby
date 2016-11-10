@@ -11,7 +11,7 @@ module LightStep
   class Tracer
     FORMAT_TEXT_MAP = 1
     FORMAT_BINARY = 2
-    FORMAT_HTTP = 3
+    FORMAT_HTTP_HEADERS = 3
 
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
@@ -97,7 +97,7 @@ module LightStep
         inject_to_text_map(span, carrier)
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary inject format not yet implemented'
-      when LightStep::Tracer::FORMAT_HTTP
+      when LightStep::Tracer::FORMAT_HTTP_HEADERS
         inject_to_http_headers(span, carrier)
       else
         warn 'Unknown inject format'
@@ -118,7 +118,7 @@ module LightStep
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
-      when LightStep::Tracer::FORMAT_HTTP
+      when LightStep::Tracer::FORMAT_HTTP_HEADERS
         extract_from_rack_env(operation_name, carrier)
       else
         warn 'Unknown join format'
@@ -182,8 +182,6 @@ module LightStep
 
     CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
     CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
-    CARRIER_RACK_HTTP_TRACER_STATE_PREFIX = "#{CARRIER_TRACER_STATE_PREFIX.gsub("-", "_").upcase}"
-    CARRIER_RACK_HTTP_BAGGAGE_PREFIX = "#{CARRIER_BAGGAGE_PREFIX.gsub("-", "_").upcase}"
 
     DEFAULT_MAX_LOG_RECORDS = 1000
     MIN_MAX_LOG_RECORDS = 1
@@ -224,22 +222,22 @@ module LightStep
     end
 
     def inject_to_http_headers(span, carrier)
-      carrier[CARRIER_RACK_HTTP_TRACER_STATE_PREFIX + 'SPANID'] = span.id
-      carrier[CARRIER_RACK_HTTP_TRACER_STATE_PREFIX + 'TRACEID'] = span.trace_id unless span.trace_id.nil?
-      carrier[CARRIER_RACK_HTTP_TRACER_STATE_PREFIX + 'SAMPLED'] = 'true'
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
-      span.baggage.each do |key, value|
-        carrier[CARRIER_RACK_HTTP_BAGGAGE_PREFIX + key.gsub("-", "_").upcase.gsub(/[^A-Z0-9_]/, '')] = value
+      span.span_context.baggage.each do |key, value|
+        carrier[CARRIER_BAGGAGE_PREFIX + key.gsub(/[^A-Za-z0-9-]/, '')] = value
       end
     end
 
     def extract_from_rack_env(operation_name, env)
       extract_from_text_map(operation_name, env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '')
-        if header.start_with?(CARRIER_RACK_HTTP_TRACER_STATE_PREFIX) ||
-           header.start_with?(CARRIER_RACK_HTTP_BAGGAGE_PREFIX)
-          memo[header.gsub("_", "-").downcase] = value
+        header = raw_header.gsub(/^HTTP_/, '').gsub("_","-").downcase
+        if header.start_with?(CARRIER_TRACER_STATE_PREFIX) ||
+           header.start_with?(CARRIER_BAGGAGE_PREFIX)
+          memo[header.downcase] = value
         end
         memo
       })

@@ -7,6 +7,7 @@ test:
 	bundle exec rake spec
 	ruby example.rb
 	ruby examples/fork_children/main.rb
+	ruby examples/rack/inject_extract.rb
 
 benchmark:
 	ruby benchmark/bench.rb

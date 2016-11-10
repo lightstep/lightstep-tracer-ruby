@@ -1,5 +1,4 @@
 require 'concurrent'
-require 'forwardable'
 require 'lightstep/span_context'
 
 module LightStep
@@ -7,18 +6,12 @@ module LightStep
   #
   # See http://www.opentracing.io for more information.
   class Span
-    extend Forwardable
-
     # Part of the OpenTracing API
     attr_writer :operation_name
 
     # Internal use only
     # @private
     attr_reader :start_micros, :end_micros, :baggage, :tags, :operation_name, :span_context
-
-    def_delegator :span_context, :id
-    def_delegator :span_context, :trace_id
-    def_delegator :span_context, :baggage
 
     # Creates a new {Span}
     #
@@ -72,9 +65,9 @@ module LightStep
     # @param value [String] the value of the baggage item
     def set_baggage_item(key, value)
       @span_context = SpanContext.new(
-        id: id,
-        trace_id: trace_id,
-        baggage: baggage.merge({key => value})
+        id: span_context.id,
+        trace_id: span_context.trace_id,
+        baggage: span_context.baggage.merge({key => value})
       )
       self
     end
@@ -83,8 +76,8 @@ module LightStep
     # @param baggage [Hash] new baggage for the span
     def set_baggage(baggage = {})
       @span_context = SpanContext.new(
-        id: id,
-        trace_id: trace_id,
+        id: span_context.id,
+        trace_id: span_context.trace_id,
         baggage: baggage
       )
     end
@@ -93,7 +86,7 @@ module LightStep
     # @param key [String] the key of the baggage item
     # @return Value of the baggage item
     def get_baggage_item(key)
-      baggage[key]
+      span_context.baggage[key]
     end
 
     # Add a log entry to this span
@@ -137,8 +130,8 @@ module LightStep
     def to_h
       {
         runtime_guid: tracer.guid,
-        span_guid: id,
-        trace_guid: trace_id,
+        span_guid: span_context.id,
+        trace_guid: span_context.trace_id,
         span_name: operation_name,
         attributes: tags.map {|key, value|
           {Key: key.to_s, Value: value}

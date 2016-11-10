@@ -64,8 +64,8 @@ module LightStep
       child_of_id = nil
       trace_id = nil
       if Span === child_of
-        child_of_id = child_of.id
-        trace_id = child_of.trace_id
+        child_of_id = child_of.span_context.id
+        trace_id = child_of.span_context.trace_id
       else
         trace_id = LightStep.guid
       end
@@ -191,11 +191,11 @@ module LightStep
     MIN_MAX_SPAN_RECORDS = 1
 
     def inject_to_text_map(span, carrier)
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.id
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.trace_id unless span.trace_id.nil?
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
       carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
-      span.baggage.each do |key, value|
+      span.span_context.baggage.each do |key, value|
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
     end

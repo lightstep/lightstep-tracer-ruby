@@ -1,5 +1,4 @@
 require 'concurrent'
-require 'forwardable'
 require 'lightstep/span_context'
 
 module LightStep
@@ -7,8 +6,6 @@ module LightStep
   #
   # See http://www.opentracing.io for more information.
   class Span
-    extend Forwardable
-
     # Part of the OpenTracing API
     attr_writer :operation_name
 

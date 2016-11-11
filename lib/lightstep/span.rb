@@ -45,15 +45,10 @@ module LightStep
 
     # Set a tag value on this span
     # @param key [String] the key of the tag
-    # @param value [String, Numeric, Boolean] the value of the tag. If it's not
-    # a String, Numeric, or Boolean it will be encoded with to_s
+    # @param value [String] the value of the tag. If it's not a String
+    # it will be encoded with to_s
     def set_tag(key, value)
-      case value
-      when String, Fixnum, TrueClass, FalseClass
-        tags[key] = value
-      else
-        tags[key] = value.to_s
-      end
+      tags[key] = value.to_s
       self
     end
 

@@ -227,18 +227,21 @@ module LightStep
       carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
       span.span_context.baggage.each do |key, value|
-        carrier[CARRIER_BAGGAGE_PREFIX + key.gsub(/[^A-Za-z0-9-]/, '')] = value
+        key = key.downcase.gsub("_", "-")
+        if key =~ /[^a-z0-9\-]/
+          # TODO: log the error internally
+          next
+        end
+        carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
     end
 
     def extract_from_rack_env(operation_name, env)
       extract_from_text_map(operation_name, env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').gsub("_","-").downcase
-        if header.start_with?(CARRIER_TRACER_STATE_PREFIX) ||
-           header.start_with?(CARRIER_BAGGAGE_PREFIX)
-          memo[header.downcase] = value
-        end
+        header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
+
+        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
         memo
       })
     end

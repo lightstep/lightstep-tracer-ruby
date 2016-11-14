@@ -293,7 +293,7 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_HTTP_HEADERS, carrier)
+    tracer.inject(span1, LightStep::Tracer::FORMAT_RACK, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
@@ -301,7 +301,13 @@ describe LightStep do
     expect(carrier['ot-baggage-unsafeheader']).to be_nil
     expect(carrier['ot-baggage-case-sensitivity-underscores']).to eq('value')
 
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_HTTP_HEADERS, carrier)
+    carrier = carrier.reduce({}) do |memo, tuple|
+      key, value = tuple
+      memo["HTTP_#{key.gsub("-", "_").upcase}"] = value
+      memo
+    end
+
+    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_RACK, carrier)
     expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
     expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
     expect(span2.get_baggage_item('footwear')).to eq('cleats')
@@ -310,7 +316,7 @@ describe LightStep do
     expect(span2.get_baggage_item('unsafeheader')).to be_nil
     expect(span2.get_baggage_item('case-sensitivity-underscores')).to eq('value')
 
-    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_HTTP_HEADERS, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
+    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
     expect(span3.span_context.trace_id).to eq('abc123')
 
     span1.finish

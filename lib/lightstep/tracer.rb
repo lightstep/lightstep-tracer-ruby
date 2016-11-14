@@ -225,8 +225,7 @@ module LightStep
       carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
 
       span.span_context.baggage.each do |key, value|
-        key = key.downcase.gsub("_", "-")
-        if key =~ /[^a-z0-9\-]/
+        if key =~ /[^A-Za-z0-9\-_]/
           # TODO: log the error internally
           next
         end

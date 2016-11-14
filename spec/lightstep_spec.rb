@@ -299,7 +299,7 @@ describe LightStep do
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
     expect(carrier['ot-baggage-unsafeheader']).to be_nil
-    expect(carrier['ot-baggage-case-sensitivity-underscores']).to eq('value')
+    expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
 
     carrier = carrier.reduce({}) do |memo, tuple|
       key, value = tuple

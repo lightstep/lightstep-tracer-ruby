@@ -1,3 +1,5 @@
+require 'lightstep/version'
+
 module LightStep
   # Reporter builds up reports of spans and flushes them to a transport
   class Reporter

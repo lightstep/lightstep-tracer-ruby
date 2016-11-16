@@ -3,8 +3,9 @@
 
 require 'bundler/setup'
 require 'lightstep'
+require 'opentracing'
 
-LightStep.configure(
+OpenTracing.global_tracer = LightStep::Tracer.new(
   component_name: 'lightstep/ruby/examples/fork_children',
   access_token: '{your_access_token}'
 )
@@ -15,15 +16,15 @@ puts 'Starting...'
 
   pid = Process.fork do
     10.times do
-      span = LightStep.start_span("my_forked_span-#{Process.pid}")
+      span = OpenTracing.global_tracer.start_span("my_forked_span-#{Process.pid}")
       sleep(0.0025 * rand(k))
       span.finish
     end
-    LightStep.flush
+    OpenTracing.global_tracer.flush
   end
 
   10.times do
-    span = LightStep.start_span("my_process_span-#{Process.pid}")
+    span = OpenTracing.global_tracer.start_span("my_process_span-#{Process.pid}")
     sleep(0.0025 * rand(k))
     span.finish
   end
@@ -32,13 +33,13 @@ puts 'Starting...'
   # NOTE: disabling discards the buffer by default, so all spans
   # get cleared here except the final toggle span
   10.times do
-    LightStep.disable
-    LightStep.enable
-    LightStep.disable
-    LightStep.disable
-    LightStep.enable
-    LightStep.enable
-    span = LightStep.start_span("my_toggle_span-#{Process.pid}")
+    OpenTracing.global_tracer.disable
+    OpenTracing.global_tracer.enable
+    OpenTracing.global_tracer.disable
+    OpenTracing.global_tracer.disable
+    OpenTracing.global_tracer.enable
+    OpenTracing.global_tracer.enable
+    span = OpenTracing.global_tracer.start_span("my_toggle_span-#{Process.pid}")
     sleep(0.0025 * rand(k))
     span.finish
   end
@@ -49,4 +50,4 @@ end
 
 puts 'Done!'
 
-LightStep.flush
+OpenTracing.global_tracer.flush

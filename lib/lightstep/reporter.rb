@@ -13,7 +13,7 @@ module LightStep
       @transport = transport
       @period = DEFAULT_PERIOD_SECONDS
 
-      start_time = LightStep.micros(Time.now)
+      start_time = OpenTracing.micros(Time.now)
       @report_start_time = start_time
 
       @runtime = {
@@ -58,7 +58,7 @@ module LightStep
 
       return if @span_records.empty?
 
-      now = LightStep.micros(Time.now)
+      now = OpenTracing.micros(Time.now)
 
       span_records = @span_records.slice!(0, @span_records.length)
       dropped_spans = 0

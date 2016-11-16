@@ -1,7 +1,8 @@
 require 'bundler/setup'
 require 'lightstep'
+require 'opentracing'
 
-LightStep.configure(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
+OpenTracing.global_tracer = LightStep::Tracer.new(component_name: 'lightstep/ruby/example', access_token: '{your_access_token}')
 
 puts 'Starting...'
 
@@ -29,7 +30,7 @@ thread = Thread.new do
   for j in 1..1000
     start = Time.now
     for i in 1..100
-      span = LightStep.start_span('my_span')
+      span = OpenTracing.start_span('my_span')
       span.log(event: 'hello world', count: i)
       span.finish
       count += 1
@@ -51,4 +52,4 @@ mutex.unlock
 watchThread.join
 
 puts 'Done!'
-LightStep.flush
+OpenTracing.global_tracer.flush

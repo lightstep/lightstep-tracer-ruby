@@ -20,7 +20,7 @@ describe LightStep do
   it 'should return a valid span from start_span' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    expect(span).to be_an_instance_of LightStep::Span
+    expect(span).to be_an_instance_of OpenTracing::Span
     span.finish
   end
 
@@ -30,36 +30,6 @@ describe LightStep do
     expect(span.operation_name).to eq('original')
     span.operation_name = 'updated'
     expect(span.operation_name).to eq('updated')
-    span.finish
-  end
-
-  it 'should allow support all the OpenTracing span APIs' do
-    tracer = init_test_tracer
-    span = tracer.start_span('my_span')
-    span.set_tag('key', 'value')
-    span.set_tag('bool', true)
-    span.set_tag('number', 500)
-    span.set_tag('array', [:hello])
-    span.set_baggage_item('baggage_key', 'baggage_item')
-    span.log(event: 'event_name', key: 'value')
-    span.finish
-  end
-
-  it 'should not allow SpanContext modification' do
-    tracer = init_test_tracer
-    span = tracer.start_span('my_span')
-    context = span.span_context
-    expect{context.baggage['foo'] = 'bar'}.to raise_error(RuntimeError)
-    expect{context.id.slice!(0,1)}.to raise_error(RuntimeError)
-    expect{context.trace_id.slice!(0,1)}.to raise_error(RuntimeError)
-  end
-
-  it 'should allow tag-setting at start_span time' do
-    tracer = init_test_tracer
-    span = tracer.start_span('my_span', tags: {'start_key' => 'start_val'})
-    span.set_tag('during_key', 'during_val')
-    expect(span.tags['start_key']).to eq('start_val')
-    expect(span.tags['during_key']).to eq('during_val')
     span.finish
   end
 
@@ -88,14 +58,6 @@ describe LightStep do
     span.finish
   end
 
-  it 'should generate string span guids' do
-    tracer = init_test_tracer
-    span = tracer.start_span('test_span')
-
-    expect(span.span_context.id).to be_an_instance_of String
-    span.finish
-  end
-
   it 'should allow start and end times to be specified explicitly' do
     tracer = init_test_tracer
 
@@ -116,16 +78,6 @@ describe LightStep do
     span3.finish(end_time: t2)
     expect(span3.start_micros).to eq(t1_micros)
     expect(span3.end_micros).to eq(t2_micros)
-  end
-
-  it 'should allow end time to be specified at finish time' do
-    tracer = init_test_tracer
-
-    t1 = Time.now
-    t1_micros = (t1.to_f * 1E6).floor
-    span = tracer.start_span('test')
-    span.finish(end_time: t1)
-    expect(span.end_micros).to eq(t1_micros)
   end
 
   it 'should assign the same trace_guid to child spans as the parent' do
@@ -259,69 +211,6 @@ describe LightStep do
     expect(single_payload.call({})).to eq(JSON.generate({}))
     expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
     expect(single_payload.call(x: 'y', a: 5, true: true)).to eq(JSON.generate(x: 'y', a: 5, true: true))
-  end
-
-  it 'should handle inject/join for text carriers' do
-    tracer = init_test_tracer
-    span1 = tracer.start_span('test_span')
-    span1.set_baggage_item('footwear', 'cleats')
-    span1.set_baggage_item('umbrella', 'golf')
-
-    carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
-    expect(carrier['ot-baggage-footwear']).to eq('cleats')
-    expect(carrier['ot-baggage-umbrella']).to eq('golf')
-
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
-    expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
-    expect(span2.get_baggage_item('footwear')).to eq('cleats')
-    expect(span2.get_baggage_item('umbrella')).to eq('golf')
-
-    span1.finish
-    span2.finish
-  end
-
-  it 'should handle inject/extract for http requests and rack' do
-    tracer = init_test_tracer
-    span1 = tracer.start_span('test_span')
-    span1.set_baggage_item('footwear', 'cleats')
-    span1.set_baggage_item('umbrella', 'golf')
-    span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
-    span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
-
-    carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_RACK, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
-    expect(carrier['ot-baggage-footwear']).to eq('cleats')
-    expect(carrier['ot-baggage-umbrella']).to eq('golf')
-    expect(carrier['ot-baggage-unsafeheader']).to be_nil
-    expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
-
-    carrier = carrier.reduce({}) do |memo, tuple|
-      key, value = tuple
-      memo["HTTP_#{key.gsub("-", "_").upcase}"] = value
-      memo
-    end
-
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_RACK, carrier)
-    expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
-    expect(span2.get_baggage_item('footwear')).to eq('cleats')
-    expect(span2.get_baggage_item('umbrella')).to eq('golf')
-    expect(span2.get_baggage_item('unsafe!@#$%$^&header')).to be_nil
-    expect(span2.get_baggage_item('unsafeheader')).to be_nil
-    expect(span2.get_baggage_item('case-sensitivity-underscores')).to eq('value')
-
-    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span3.span_context.trace_id).to eq('abc123')
-
-    span1.finish
-    span2.finish
-    span3.finish
   end
 
   it 'should handle concurrent spans' do

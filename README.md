@@ -25,7 +25,7 @@ Or install it yourself as:
     require 'lightstep'
 
     # Initialize the OpenTracing global tracer
-    Opentracing.global_tracer = LightStep::Tracer.new(
+    OpenTracing.global_tracer = LightStep::Tracer.new(
       component_name: 'lightstep/ruby/example',
       access_token: 'your_access_token'
     )

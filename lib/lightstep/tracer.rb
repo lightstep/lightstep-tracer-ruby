@@ -11,6 +11,7 @@ module LightStep
   class Tracer
     FORMAT_TEXT_MAP = 1
     FORMAT_BINARY = 2
+    FORMAT_RACK = 3
 
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
@@ -89,13 +90,15 @@ module LightStep
     # Inject a span into the given carrier
     # @param span [Span]
     # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash-like]
+    # @param carrier [Hash]
     def inject(span, format, carrier)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
         inject_to_text_map(span, carrier)
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary inject format not yet implemented'
+      when LightStep::Tracer::FORMAT_RACK
+        inject_to_rack(span, carrier)
       else
         warn 'Unknown inject format'
       end
@@ -104,7 +107,7 @@ module LightStep
     # Extract a span from a carrier
     # @param operation_name [String]
     # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash-like]
+    # @param carrier [Hash]
     # @return [Span]
     def extract(operation_name, format, carrier)
       case format
@@ -113,6 +116,8 @@ module LightStep
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
+      when LightStep::Tracer::FORMAT_RACK
+        extract_from_rack(operation_name, carrier)
       else
         warn 'Unknown join format'
         nil
@@ -212,6 +217,30 @@ module LightStep
       span.set_baggage(baggage)
 
       span
+    end
+
+    def inject_to_rack(span, carrier)
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+      carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
+
+      span.span_context.baggage.each do |key, value|
+        if key =~ /[^A-Za-z0-9\-_]/
+          # TODO: log the error internally
+          next
+        end
+        carrier[CARRIER_BAGGAGE_PREFIX + key] = value
+      end
+    end
+
+    def extract_from_rack(operation_name, env)
+      extract_from_text_map(operation_name, env.reduce({}){|memo, tuple|
+        raw_header, value = tuple
+        header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
+
+        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
+        memo
+      })
     end
   end
 end

@@ -3,13 +3,14 @@ require 'simplecov'
 SimpleCov.command_name 'example.rb'
 SimpleCov.start
 require 'lightstep'
+require 'opentracing'
 
 access_token = '{your_access_token}'
 
-LightStep.configure(component_name: 'lightstep/ruby/example', access_token: access_token)
+tracer = LightStep::Tracer.new(component_name: 'lightstep/ruby/example', access_token: access_token)
 
 puts 'Starting operation...'
-span = LightStep.start_span('my_span')
+span = tracer.start_span('my_span')
 thread1 = Thread.new do
   for i in 1..10
     sleep(0.15)
@@ -20,7 +21,7 @@ end
 thread2 = Thread.new do
   current = 1
   for i in 1..16
-    child = LightStep.start_span('my_child', child_of: span)
+    child = tracer.start_span('my_child', child_of: span)
     sleep(0.1)
     current *= 2
     child.log(event: "2^#{i}", result: current)
@@ -29,6 +30,6 @@ thread2 = Thread.new do
 end
 [thread1, thread2].each(&:join)
 span.finish
-LightStep.flush
+tracer.flush
 puts 'Done!'
 puts "https://app.lightstep.com/#{access_token}/trace?span_guid=#{span.span_context.id}&at_micros=#{span.start_micros}"

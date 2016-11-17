@@ -3,6 +3,7 @@ require 'securerandom'
 
 require 'bundler/setup'
 require 'lightstep'
+require 'opentracing'
 
 rng = Random.new
 
@@ -53,7 +54,7 @@ Benchmark.bm(32) do |x|
     span = tracer.start_span('my_span')
     for i in 0..10_000
       carrier = {}
-      tracer.inject(span, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+      OpenTracing.inject(span.span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
      end
     span.finish
   end

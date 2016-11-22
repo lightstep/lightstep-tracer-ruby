@@ -261,6 +261,28 @@ describe LightStep do
     expect(single_payload.call(x: 'y', a: 5, true: true)).to eq(JSON.generate(x: 'y', a: 5, true: true))
   end
 
+  it 'should report user-specified tracer-level tags' do
+    result = nil
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: proc {|obj| result = obj }),
+      tags: {
+        "user-provided-string" => "value",
+        "user-provided-number" => 12,
+        "user-provided-array" => []
+      }
+    )
+    s0 = tracer.start_span('s0')
+    s0.log(event: 'test_event')
+    s0.finish
+    tracer.flush
+
+    expect(result).to include(:runtime, :span_records, :oldest_micros, :youngest_micros)
+    expect(result[:runtime][:attrs]).to include({Key: "user-provided-string", Value: "value"})
+    expect(result[:runtime][:attrs]).to include({Key: "user-provided-number", Value: "12"})
+    expect(result[:runtime][:attrs]).to include({Key: "user-provided-array", Value: "[]"})
+  end
+
   it 'should handle inject/join for text carriers' do
     tracer = init_test_tracer
     span1 = tracer.start_span('test_span')

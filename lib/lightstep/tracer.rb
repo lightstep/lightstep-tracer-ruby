@@ -23,10 +23,11 @@ module LightStep
     # @param component_name [String] Component name to use for the tracer
     # @param access_token [String] The project access token when pushing to LightStep
     # @param transport [LightStep::Transport] How the data should be transported
+    # @param tags [Hash] Tracer-level tags
     # @return LightStep::Tracer
     # @raise LightStep::ConfigurationError if the group name or access token is not a valid string.
-    def initialize(component_name:, access_token: nil, transport: nil)
-      configure(component_name: component_name, access_token: access_token, transport: transport)
+    def initialize(component_name:, access_token: nil, transport: nil, tags: {})
+      configure(component_name: component_name, access_token: access_token, transport: transport, tags: tags)
     end
 
     def max_log_records
@@ -158,7 +159,7 @@ module LightStep
 
     protected
 
-    def configure(component_name:, access_token: nil, transport: nil)
+    def configure(component_name:, access_token: nil, transport: nil, tags: {})
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
@@ -172,7 +173,8 @@ module LightStep
         max_span_records: max_span_records,
         transport: transport,
         guid: guid,
-        component_name: component_name
+        component_name: component_name,
+        tags: tags
       )
     end
 

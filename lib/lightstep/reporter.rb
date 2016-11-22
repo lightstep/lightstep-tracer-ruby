@@ -7,7 +7,7 @@ module LightStep
     attr_accessor :max_span_records
     attr_accessor :period
 
-    def initialize(max_span_records:, transport:, guid:, component_name:)
+    def initialize(max_span_records:, transport:, guid:, component_name:, tags: {})
       @max_span_records = max_span_records
       @span_records = Concurrent::Array.new
       @dropped_spans = Concurrent::AtomicFixnum.new
@@ -26,7 +26,7 @@ module LightStep
           {Key: "lightstep.tracer_platform",         Value: "ruby"},
           {Key: "lightstep.tracer_version",          Value: LightStep::VERSION},
           {Key: "lightstep.tracer_platform_version", Value: RUBY_VERSION}
-        ]
+        ] + tags.map{|k,v| {Key: k.to_s, Value: v.to_s}}
       }.freeze
 
       reset_on_fork

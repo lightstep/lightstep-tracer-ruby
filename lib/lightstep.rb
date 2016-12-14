@@ -26,7 +26,6 @@ module LightStep
   # Returns a random guid. Note: this intentionally does not use SecureRandom,
   # which is slower and cryptographically secure randomness is not required here.
   def self.guid
-    @_rng ||= Random.new
     # Re-seed the PRNG on a PID change
     if @_lastpid != $$
       @_lastpid = $$

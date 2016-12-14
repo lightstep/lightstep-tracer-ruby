@@ -28,7 +28,7 @@ module LightStep
   def self.guid
     @_rng ||= Random.new
     # Re-seed the PRNG on a PID change
-    if @_lastpid ||= $$
+    if @_lastpid != $$
       @_lastpid = $$
       @_rng = Random.new
     end

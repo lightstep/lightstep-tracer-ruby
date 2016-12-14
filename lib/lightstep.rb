@@ -26,7 +26,7 @@ module LightStep
   # Returns a random guid. Note: this intentionally does not use SecureRandom,
   # which is slower and cryptographically secure randomness is not required here.
   def self.guid
-    if @_lastpid != Process.pid
+    unless @_lastpid == Process.pid
       @_lastpid = Process.pid
       @_rng = Random.new
     end

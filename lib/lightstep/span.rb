@@ -16,7 +16,8 @@ module LightStep
     # Creates a new {Span}
     #
     # @param tracer [Tracer] the tracer that created this span
-    # @param operation_name [String] the operation name of this span
+    # @param operation_name [String] the operation name of this span. If it's
+    # not a String it will be encoded with to_s.
     # @param child_of_guid [String] the guid of the span this span is a child of
     # @param trace_guid [String] the guid of this span's trace
     # @param start_micros [Numeric] start time of the span in microseconds
@@ -37,7 +38,7 @@ module LightStep
       @max_log_records = max_log_records
 
       @tracer = tracer
-      self.operation_name = operation_name
+      self.operation_name = operation_name.to_s
       self.start_micros = start_micros
       @span_context = SpanContext.new(id: LightStep.guid, trace_id: trace_id)
       set_tag(:parent_span_guid, child_of_id) if !child_of_id.nil?

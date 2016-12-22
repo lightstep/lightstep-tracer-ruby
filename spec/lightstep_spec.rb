@@ -487,4 +487,15 @@ describe LightStep do
     expect(result).to be_a(Hash)
     expect(result[:span_records].first[:runtime_guid]).to eq(tracer.guid)
   end
+
+  it 'should convert span names to strings' do
+    result = nil
+    tracer = init_callback_tracer(proc { |obj| result = obj })
+    tracer.start_span(5).finish
+    tracer.start_span([:foo]).finish
+    tracer.flush
+    records = result[:span_records]
+    expect(records[0][:span_name]).to eq("5")
+    expect(records[1][:span_name]).to eq("[:foo]")
+  end
 end

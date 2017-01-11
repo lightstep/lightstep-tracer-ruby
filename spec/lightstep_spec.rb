@@ -457,9 +457,8 @@ describe LightStep do
       end
     end.map(&:join)
     tracer.flush
-    expect(result[:counters]).to eq([
-      {Name: "dropped_logs", Value: 75},
-      {Name: "dropped_spans", Value: 5}
+    expect(result[:internal_metrics][:counts]).to eq([
+      {name: "spans.dropped", int64_value: 5}
     ])
   end
 

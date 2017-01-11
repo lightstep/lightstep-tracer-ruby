@@ -102,7 +102,7 @@ module LightStep
         record[:payload_json] = JSON.generate(fields, max_nesting: 8)
       rescue
         # TODO: failure to encode a payload as JSON should be recorded in the
-        # internal library logs, with catioun not flooding the internal logs.
+        # internal library logs, being careful not to flood them.
       end
 
       log_records.push(record)

@@ -11,7 +11,6 @@ module LightStep
       @max_span_records = max_span_records
       @span_records = Concurrent::Array.new
       @dropped_spans = Concurrent::AtomicFixnum.new
-      @dropped_span_logs = Concurrent::AtomicFixnum.new
       @transport = transport
       @period = DEFAULT_PERIOD_SECONDS
 
@@ -37,9 +36,8 @@ module LightStep
 
       @span_records.push(span.to_h)
       if @span_records.size > max_span_records
-        dropped = @span_records.shift
+        @span_records.shift
         @dropped_spans.increment
-        @dropped_span_logs.increment(dropped[:log_records].size + dropped[:dropped_logs])
       end
     end
 
@@ -48,11 +46,6 @@ module LightStep
 
       span_records = @span_records.slice!(0, @span_records.length)
       @dropped_spans.increment(span_records.size)
-      @dropped_span_logs.increment(
-        span_records.reduce(0) {|memo, span|
-          memo + span[:log_records].size + span[:dropped_logs]
-        }
-      )
     end
 
     def flush
@@ -65,13 +58,6 @@ module LightStep
       span_records = @span_records.slice!(0, @span_records.length)
       dropped_spans = 0
       @dropped_spans.update{|old| dropped_spans = old; 0 }
-
-      old_dropped_span_logs = 0
-      @dropped_span_logs.update{|old| old_dropped_span_logs = old; 0 }
-      dropped_logs = old_dropped_span_logs
-      dropped_logs = span_records.reduce(dropped_logs) do |memo, span|
-        memo += span.delete :dropped_logs
-      end
 
       report_request = {
         runtime: @runtime,
@@ -90,11 +76,9 @@ module LightStep
       begin
         @transport.report(report_request)
       rescue
-        # an error occurs, add the previous dropped logs to the logs
-        # that were going to get reported, as well as the previous dropped
-        # spans and spans that would have been recorded
+	# an error occurs, add the previous dropped_spans and count of spans
+	# that would have been recorded
         @dropped_spans.increment(dropped_spans + span_records.length)
-        @dropped_span_logs.increment(old_dropped_span_logs)
       end
     end
 
@@ -107,7 +91,6 @@ module LightStep
         @pid = $$
         @span_records.clear
         @dropped_spans.value = 0
-        @dropped_span_logs.value = 0
         report_spans
       end
     end

@@ -78,10 +78,11 @@ module LightStep
         oldest_micros: @report_start_time,
         youngest_micros: now,
         span_records: span_records,
-        counters: [
-          {Name: "dropped_logs",  Value: dropped_logs},
-          {Name: "dropped_spans", Value: dropped_spans},
-        ]
+        internal_metrics: {
+	  counts: [
+	    {name: "spans.dropped", int64_value: dropped_spans},
+	  ]
+        }
       }
 
       @report_start_time = now

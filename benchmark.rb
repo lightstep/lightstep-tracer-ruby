@@ -1,5 +1,6 @@
 require 'json'
 require 'lightstep'
+require 'opentracing'
 require 'net/http'
 require 'pp'
 require 'uri'
@@ -15,10 +16,7 @@ $test_tracer = LightStep::Tracer.new(
     access_token: 'none'
   )
 )
-$noop_tracer = LightStep::Tracer.new(
-  component_name: 'ruby',
-  transport: LightStep::Transport::Nil.new
-)
+$noop_tracer = OpenTracing::Tracer.new
 
 $prime_work = 982451653
 $logs_memory = ""

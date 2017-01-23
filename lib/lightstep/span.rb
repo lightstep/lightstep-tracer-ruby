@@ -11,7 +11,7 @@ module LightStep
 
     # Internal use only
     # @private
-    attr_reader :start_micros, :end_micros, :baggage, :tags, :operation_name, :span_context
+    attr_reader :start_micros, :end_micros, :tags, :operation_name, :span_context
 
     # Creates a new {Span}
     #
@@ -76,6 +76,11 @@ module LightStep
         trace_id: span_context.trace_id,
         baggage: baggage
       )
+    end
+
+    # Returns the baggage associated with the span
+    def baggage
+      @span_context.nil? ? {} : @span_context.baggage
     end
 
     # Get a baggage item

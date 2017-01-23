@@ -78,11 +78,6 @@ module LightStep
       )
     end
 
-    # Returns the baggage associated with the span
-    def baggage
-      @span_context.nil? ? {} : @span_context.baggage
-    end
-
     # Get a baggage item
     # @param key [String] the key of the baggage item
     # @return Value of the baggage item

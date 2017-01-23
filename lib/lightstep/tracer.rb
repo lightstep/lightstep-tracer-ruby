@@ -82,7 +82,7 @@ module LightStep
       )
 
       if Span === child_of
-        span.set_baggage(child_of.baggage)
+        span.set_baggage(child_of.span_context.baggage)
       end
 
       span

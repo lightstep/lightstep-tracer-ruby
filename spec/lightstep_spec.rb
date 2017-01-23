@@ -24,6 +24,14 @@ describe LightStep do
     span.finish
   end
 
+  it 'should inherit baggage from parent spans' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', child_of: parent_span)
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+  end
+
   it 'should allow operation_name updates' do
     tracer = init_test_tracer
     span = tracer.start_span('original')

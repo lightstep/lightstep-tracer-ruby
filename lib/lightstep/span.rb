@@ -11,7 +11,7 @@ module LightStep
 
     # Internal use only
     # @private
-    attr_reader :start_micros, :end_micros, :baggage, :tags, :operation_name, :span_context
+    attr_reader :start_micros, :end_micros, :tags, :operation_name, :span_context
 
     # Creates a new {Span}
     #

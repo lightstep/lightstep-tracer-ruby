@@ -258,8 +258,6 @@ describe LightStep do
       s0.log(**fields)
       s0.finish
       tracer.flush
-      # print JSON.parse(result[:span_records][0][:log_records][0][:fields])
-      print result[:span_records][0][:log_records][0][:fields]
       JSON.generate(result[:span_records][0][:log_records][0][:fields])
     end
 

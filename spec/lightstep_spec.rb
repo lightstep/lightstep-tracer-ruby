@@ -167,7 +167,7 @@ describe LightStep do
     end
   end
 
-  it 'should handle all valid payloads types' do
+  it 'should handle all valid field types' do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
     file = File.open('./lib/lightstep.rb', 'r')
@@ -253,20 +253,26 @@ describe LightStep do
       transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
     )
 
-    single_payload = proc do |fields|
+    reported_fields = proc do |fields|
       s0 = tracer.start_span('s0')
-      s0.log(event: 'test_event', **fields)
+      s0.log(**fields)
       s0.finish
       tracer.flush
-      JSON.generate(JSON.parse(result[:span_records][0][:log_records][0][:payload_json]))
+      # print JSON.parse(result[:span_records][0][:log_records][0][:fields])
+      print result[:span_records][0][:log_records][0][:fields]
+      JSON.generate(result[:span_records][0][:log_records][0][:fields])
     end
 
     # NOTE: these comparisons rely on Ruby generating a consistent ordering to
     # map keys
 
-    expect(single_payload.call({})).to eq(JSON.generate({}))
-    expect(single_payload.call(x: 'y')).to eq(JSON.generate(x: 'y'))
-    expect(single_payload.call(x: 'y', a: 5, true: true)).to eq(JSON.generate(x: 'y', a: 5, true: true))
+    expect(reported_fields.call({})).to eq(JSON.generate([]))
+    expect(reported_fields.call(x: 'y')).to eq(JSON.generate([{Key: 'x', Value: 'y'}]))
+    expect(reported_fields.call(x: 'y', a: 5, true: true)).to eq(JSON.generate([
+      {Key: 'x', Value: 'y'},
+      {Key: 'a', Value: '5'},
+      {Key: 'true', Value: 'true'}
+    ]))
   end
 
   it 'should report user-specified tracer-level tags' do

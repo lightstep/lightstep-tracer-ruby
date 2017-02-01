@@ -92,18 +92,16 @@ module LightStep
     def log(event: nil, timestamp: Time.now, **fields)
       return unless tracer.enabled?
 
-      record = {
-        runtime_guid: tracer.guid,
-        timestamp_micros: LightStep.micros(timestamp)
-      }
-      record[:stable_name] = event.to_s if !event.nil?
-
-      begin
-        record[:payload_json] = JSON.generate(fields, max_nesting: 8)
-      rescue
-        # TODO: failure to encode a payload as JSON should be recorded in the
-        # internal library logs, being careful not to flood them.
+      fields = {} if fields.nil?
+      unless event.nil?
+	fields[:event] = event.to_s
       end
+      record = {
+        timestamp_micros: LightStep.micros(timestamp),
+        fields: fields.to_a.map {|key, value|
+          {Key: key.to_s, Value: value.to_s}
+        },
+      }
 
       log_records.push(record)
       if log_records.size > @max_log_records

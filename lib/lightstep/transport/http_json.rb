@@ -30,8 +30,8 @@ module LightStep
         @verbose = verbose
         @encryption = encryption
 
-        raise ConfigurationError, "access_token must be a string" unless String === access_token
-        raise ConfigurationError, "access_token cannot be blank"  if access_token.empty?
+        raise Tracer::ConfigurationError, "access_token must be a string" unless String === access_token
+        raise Tracer::ConfigurationError, "access_token cannot be blank"  if access_token.empty?
         @access_token = access_token
       end
 

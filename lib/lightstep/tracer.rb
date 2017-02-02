@@ -225,7 +225,7 @@ module LightStep
         end
         span.set_baggage(baggage)
       else
-        span = start_span(operation_name: operation_name)
+        span = start_span(operation_name)
       end
 
       span

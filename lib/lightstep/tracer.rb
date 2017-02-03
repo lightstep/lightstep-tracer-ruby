@@ -183,15 +183,19 @@ module LightStep
     CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
     CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
 
+    CARRIER_SPAN_ID = (CARRIER_TRACER_STATE_PREFIX + 'spanid').freeze
+    CARRIER_TRACE_ID = (CARRIER_TRACER_STATE_PREFIX + 'traceid').freeze
+    CARRIER_SAMPLED = (CARRIER_TRACER_STATE_PREFIX + 'sampled').freeze
+
     DEFAULT_MAX_LOG_RECORDS = 1000
     MIN_MAX_LOG_RECORDS = 1
     DEFAULT_MAX_SPAN_RECORDS = 1000
     MIN_MAX_SPAN_RECORDS = 1
 
     def inject_to_text_map(span, carrier)
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
+      carrier[CARRIER_SPAN_ID] = span.span_context.id
+      carrier[CARRIER_TRACE_ID] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+      carrier[CARRIER_SAMPLED] = 'true'
 
       span.span_context.baggage.each do |key, value|
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
@@ -199,12 +203,18 @@ module LightStep
     end
 
     def extract_from_text_map(operation_name, carrier)
+      # If the carrier does not have both the span_id and trace_id key
+      # skip the processing and just return a normal span
+      if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
+        return start_span(operation_name)
+      end
+
       span = Span.new(
         tracer: self,
         operation_name: operation_name,
         start_micros: LightStep.micros(Time.now),
-        child_of_id: carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'],
-        trace_id: carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'],
+        child_of_id: carrier[CARRIER_SPAN_ID],
+        trace_id: carrier[CARRIER_TRACE_ID],
         max_log_records: max_log_records
       )
 
@@ -222,9 +232,9 @@ module LightStep
     end
 
     def inject_to_rack(span, carrier)
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'spanid'] = span.span_context.id
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'traceid'] = span.span_context.trace_id unless span.span_context.trace_id.nil?
-      carrier[CARRIER_TRACER_STATE_PREFIX + 'sampled'] = 'true'
+      carrier[CARRIER_SPAN_ID] = span.span_context.id
+      carrier[CARRIER_TRACE_ID] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+      carrier[CARRIER_SAMPLED] = 'true'
 
       span.span_context.baggage.each do |key, value|
         if key =~ /[^A-Za-z0-9\-_]/

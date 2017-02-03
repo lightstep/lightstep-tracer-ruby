@@ -205,28 +205,28 @@ module LightStep
     def extract_from_text_map(operation_name, carrier)
       # If the carrier does not have both the span_id and trace_id key
       # skip the processing and just return a normal span
-      if carrier.has_key?(CARRIER_SPAN_ID) && carrier.has_key?(CARRIER_TRACE_ID)
-        span = Span.new(
-          tracer: self,
-          operation_name: operation_name,
-          start_micros: LightStep.micros(Time.now),
-          child_of_id: carrier[CARRIER_SPAN_ID],
-          trace_id: carrier[CARRIER_TRACE_ID],
-          max_log_records: max_log_records
-        )
-
-        baggage = carrier.reduce({}) do |baggage, tuple|
-          key, value = tuple
-          if key.start_with?(CARRIER_BAGGAGE_PREFIX)
-            plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
-            baggage[plain_key] = value
-          end
-          baggage
-        end
-        span.set_baggage(baggage)
-      else
-        span = start_span(operation_name)
+      if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
+        return start_span(operation_name)
       end
+
+      span = Span.new(
+        tracer: self,
+        operation_name: operation_name,
+        start_micros: LightStep.micros(Time.now),
+        child_of_id: carrier[CARRIER_SPAN_ID],
+        trace_id: carrier[CARRIER_TRACE_ID],
+        max_log_records: max_log_records
+      )
+
+      baggage = carrier.reduce({}) do |baggage, tuple|
+        key, value = tuple
+        if key.start_with?(CARRIER_BAGGAGE_PREFIX)
+          plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
+          baggage[plain_key] = value
+        end
+        baggage
+      end
+      span.set_baggage(baggage)
 
       span
     end

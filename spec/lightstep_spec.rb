@@ -350,12 +350,24 @@ describe LightStep do
     expect(span2.get_baggage_item('unsafeheader')).to be_nil
     expect(span2.get_baggage_item('case-sensitivity-underscores')).to eq('value')
 
+    # We need both a TRACEID and SPANID; this won't adopt the TRACEID.
     span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span3.span_context.trace_id).to eq('abc123')
+    expect(span3.span_context.trace_id).not_to eq('abc123')
+
+    # We need both a TRACEID and SPANID; this won't adopt the SPANID.
+    span4 = tracer.extract('test_span_4', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
+    expect(span4.span_context.id).not_to eq('abc123')
+
+    # We need both a TRACEID and SPANID; this has both so it should work.
+    span5 = tracer.extract('test_span_4', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
+    expect(span5.tags[:parent_span_guid]).to eq('abc123')
+    expect(span5.span_context.trace_id).to eq('bcd234')
 
     span1.finish
     span2.finish
     span3.finish
+    span4.finish
+    span5.finish
   end
 
   it 'should handle concurrent spans' do

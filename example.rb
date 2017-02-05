@@ -20,7 +20,7 @@ end
 thread2 = Thread.new do
   current = 1
   for i in 1..16
-    child = LightStep.start_span('my_child', child_of: span)
+    child = LightStep.start_span('my_child', child_of: span.span_context)
     sleep(0.1)
     current *= 2
     child.log(event: "2^#{i}", result: current)

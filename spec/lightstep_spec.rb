@@ -28,7 +28,7 @@ describe LightStep do
     tracer = init_test_tracer
     parent_span = tracer.start_span('parent_span')
     parent_span.set_baggage(test: 'value')
-    child_span = tracer.start_span('child_span', child_of: parent_span)
+    child_span = tracer.start_span('child_span', child_of: parent_span.span_context)
     expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
   end
 
@@ -141,19 +141,21 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1) }
-    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1.span_context) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2.span_context) }
 
     children1.each do |child|
       expect(child.span_context.trace_id).to be_an_instance_of String
       expect(child.span_context.trace_id).to eq(parent1.span_context.trace_id)
       expect(child.span_context.trace_id).not_to eq(parent2.span_context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent1.span_context.id)
     end
 
     children2.each do |child|
       expect(child.span_context.trace_id).to be_an_instance_of String
       expect(child.span_context.trace_id).to eq(parent2.span_context.trace_id)
       expect(child.span_context.trace_id).not_to eq(parent1.span_context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent2.span_context.id)
     end
 
     children1.each(&:finish)
@@ -213,10 +215,10 @@ describe LightStep do
   it 'should handle nested spans' do
     tracer = init_test_tracer
     s0 = tracer.start_span('s0')
-    s1 = tracer.start_span('s1', child_of: s0)
-    s2 = tracer.start_span('s2', child_of: s1)
-    s3 = tracer.start_span('s3', child_of: s2)
-    s4 = tracer.start_span('s4', child_of: s3)
+    s1 = tracer.start_span('s1', child_of: s0.span_context)
+    s2 = tracer.start_span('s2', child_of: s1.span_context)
+    s3 = tracer.start_span('s3', child_of: s2.span_context)
+    s4 = tracer.start_span('s4', child_of: s3.span_context)
     s4.finish
     s3.finish
     s2.finish
@@ -302,20 +304,19 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+    tracer.inject(span1.span_context, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
-    expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
-    expect(span2.get_baggage_item('footwear')).to eq('cleats')
-    expect(span2.get_baggage_item('umbrella')).to eq('golf')
+    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
+    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.baggage['footwear']).to eq('cleats')
+    expect(span_ctx.baggage['umbrella']).to eq('golf')
 
     span1.finish
-    span2.finish
   end
 
   it 'should handle inject/extract for http requests and rack' do
@@ -327,7 +328,7 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1, LightStep::Tracer::FORMAT_RACK, carrier)
+    tracer.inject(span1.span_context, LightStep::Tracer::FORMAT_RACK, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
@@ -341,33 +342,27 @@ describe LightStep do
       memo
     end
 
-    span2 = tracer.extract('test_span_2', LightStep::Tracer::FORMAT_RACK, carrier)
-    expect(span2.span_context.trace_id).to eq(span1.span_context.trace_id)
-    expect(span2.tags[:parent_span_guid]).to eq(span1.span_context.id)
-    expect(span2.get_baggage_item('footwear')).to eq('cleats')
-    expect(span2.get_baggage_item('umbrella')).to eq('golf')
-    expect(span2.get_baggage_item('unsafe!@#$%$^&header')).to be_nil
-    expect(span2.get_baggage_item('unsafeheader')).to be_nil
-    expect(span2.get_baggage_item('case-sensitivity-underscores')).to eq('value')
+    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, carrier)
+    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
+    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.baggage['footwear']).to eq('cleats')
+    expect(span_ctx.baggage['umbrella']).to eq('golf')
+    expect(span_ctx.baggage['unsafe!@#$%$^&header']).to be_nil
+    expect(span_ctx.baggage['unsafeheader']).to be_nil
+    expect(span_ctx.baggage['case-sensitivity-underscores']).to eq('value')
 
-    # We need both a TRACEID and SPANID; this won't adopt the TRACEID.
-    span3 = tracer.extract('test_span_3', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span3.span_context.trace_id).not_to eq('abc123')
-
-    # We need both a TRACEID and SPANID; this won't adopt the SPANID.
-    span4 = tracer.extract('test_span_4', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
-    expect(span4.span_context.id).not_to eq('abc123')
+    # We need both a TRACEID and SPANID.
+    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
+    expect(span_ctx).to be_nil
+    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
+    expect(span_ctx).to be_nil
 
     # We need both a TRACEID and SPANID; this has both so it should work.
-    span5 = tracer.extract('test_span_4', LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
-    expect(span5.tags[:parent_span_guid]).to eq('abc123')
-    expect(span5.span_context.trace_id).to eq('bcd234')
+    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
+    expect(span_ctx.id).to eq('abc123')
+    expect(span_ctx.trace_id).to eq('bcd234')
 
     span1.finish
-    span2.finish
-    span3.finish
-    span4.finish
-    span5.finish
   end
 
   it 'should handle concurrent spans' do

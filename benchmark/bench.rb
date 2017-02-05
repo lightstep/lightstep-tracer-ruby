@@ -53,7 +53,7 @@ Benchmark.bm(32) do |x|
     span = tracer.start_span('my_span')
     for i in 0..10_000
       carrier = {}
-      tracer.inject(span, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+      tracer.inject(span.span_context, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
      end
     span.finish
   end

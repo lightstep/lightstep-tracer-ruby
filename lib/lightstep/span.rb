@@ -17,20 +17,22 @@ module LightStep
     #
     # @param tracer [Tracer] the tracer that created this span
     # @param operation_name [String] the operation name of this span. If it's
-    # not a String it will be encoded with to_s.
-    # @param child_of_guid [String] the guid of the span this span is a child of
-    # @param trace_guid [String] the guid of this span's trace
+    #        not a String it will be encoded with to_s.
+    # @param child_of [SpanContext] the parent SpanContext (per child_of)
     # @param start_micros [Numeric] start time of the span in microseconds
-    # @return [Span] a new Span
+    # @param tags [Hash] initial key:value tags (per set_tag) for the Span
+    # @param max_log_records [Numeric] maximum allowable number of log records
+    #        for the Span
+    # @return [Span] a started Span
     def initialize(
       tracer:,
       operation_name:,
-      child_of_id: nil,
-      trace_id:,
+      child_of: nil,
       start_micros:,
       tags: nil,
       max_log_records:
     )
+      child_of = child_of.span_context if (Span === child_of)
       @tags = Concurrent::Hash.new
       @tags.update(tags) unless tags.nil?
       @log_records = Concurrent::Array.new
@@ -40,8 +42,14 @@ module LightStep
       @tracer = tracer
       self.operation_name = operation_name.to_s
       self.start_micros = start_micros
+
+      trace_id = (SpanContext === child_of ? child_of.trace_id : LightStep.guid)
       @span_context = SpanContext.new(id: LightStep.guid, trace_id: trace_id)
-      set_tag(:parent_span_guid, child_of_id) if !child_of_id.nil?
+
+      if SpanContext === child_of
+        set_baggage(child_of.baggage)
+        set_tag(:parent_span_guid, child_of.id)
+      end
     end
 
     # Set a tag value on this span

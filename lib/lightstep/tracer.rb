@@ -65,7 +65,7 @@ module LightStep
     # @param tags [Hash] Tags to assign to the Span at start time
     # @return [Span]
     def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
-      span = Span.new(
+      Span.new(
         tracer: self,
         operation_name: operation_name,
         child_of: child_of,
@@ -73,8 +73,6 @@ module LightStep
         tags: tags,
         max_log_records: max_log_records,
       )
-
-      span
     end
 
     # Inject a SpanContext into the given carrier
@@ -83,6 +81,7 @@ module LightStep
     # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
     # @param carrier [Hash]
     def inject(span_context, format, carrier)
+      child_of = child_of.span_context if (Span === child_of)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
         inject_to_text_map(span_context, carrier)
@@ -206,12 +205,11 @@ module LightStep
         end
         baggage
       end
-      span_context = SpanContext.new(
+      SpanContext.new(
         id: carrier[CARRIER_SPAN_ID],
         trace_id: carrier[CARRIER_TRACE_ID],
         baggage: baggage,
       )
-      span_context
     end
 
     def inject_to_rack(span_context, carrier)

@@ -15,7 +15,13 @@ module LightStep
     # Configure the GlobalTracer
     # See {LightStep::Tracer#initialize}
     def configure(**options)
-      raise ConfigurationError, 'Already configured' if configured
+      if configured
+        puts "LIGHTSTEP WARNING: Already configured. Stack trace:"
+        puts caller
+        puts
+        return
+      end
+
       self.configured = true
       super
     end

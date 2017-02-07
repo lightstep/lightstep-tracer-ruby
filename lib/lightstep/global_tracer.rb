@@ -16,7 +16,8 @@ module LightStep
     # See {LightStep::Tracer#initialize}
     def configure(**options)
       if configured
-        LightStep.logger.warn "LIGHTSTEP WARNING: Already configured. Stack trace:\n\t#{caller.join("\n\t")}"
+        LightStep.logger.warn "[LightStep] Already configured"
+        LightStep.logger.info "Stack trace:\n\t#{caller.join("\n\t")}"
         return
       end
 

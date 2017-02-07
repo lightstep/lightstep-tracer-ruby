@@ -1,3 +1,3 @@
 module LightStep
-  VERSION = '0.10.9'.freeze
+  VERSION = '0.11.0'.freeze
 end

@@ -33,7 +33,7 @@ Or install it yourself as:
 
     # Create a child span (and add some artificial delays to illustrate the timing)
     sleep(0.1)
-    child = LightStep.start_span('my_child', child_of: span)
+    child = LightStep.start_span('my_child', child_of: span.span_context)
     sleep(0.2)
     child.finish
     sleep(0.1)

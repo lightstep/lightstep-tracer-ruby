@@ -53,72 +53,60 @@ module LightStep
       @reporter.period = seconds
     end
 
-    # TODO(ngauthier@gmail.com) inherit SpanContext from references
+    # TODO(bhs): Support FollowsFrom and multiple references
 
     # Starts a new span.
-    # @param operation_name [String] the operation name for the Span
-    # @param child_of [Span] Span to inherit from
+    #
+    # @param operation_name [String] The operation name for the Span
+    # @param child_of [SpanContext] SpanContext that acts as a parent to
+    #        the newly-started Span. If a Span instance is provided, its
+    #        .span_context is automatically substituted.
     # @param start_time [Time] When the Span started, if not now
-    # @param tags [Hash] tags for the span
+    # @param tags [Hash] Tags to assign to the Span at start time
     # @return [Span]
     def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
-      child_of_id = nil
-      trace_id = nil
-      if Span === child_of
-        child_of_id = child_of.span_context.id
-        trace_id = child_of.span_context.trace_id
-      else
-        trace_id = LightStep.guid
-      end
-
-      span = Span.new(
+      Span.new(
         tracer: self,
         operation_name: operation_name,
-        child_of_id: child_of_id,
-        trace_id: trace_id,
+        child_of: child_of,
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
-        max_log_records: max_log_records
+        max_log_records: max_log_records,
       )
-
-      if Span === child_of
-        span.set_baggage(child_of.span_context.baggage)
-      end
-
-      span
     end
 
-    # Inject a span into the given carrier
-    # @param span [Span]
+    # Inject a SpanContext into the given carrier
+    #
+    # @param spancontext [SpanContext]
     # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
     # @param carrier [Hash]
-    def inject(span, format, carrier)
+    def inject(span_context, format, carrier)
+      child_of = child_of.span_context if (Span === child_of)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
-        inject_to_text_map(span, carrier)
+        inject_to_text_map(span_context, carrier)
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary inject format not yet implemented'
       when LightStep::Tracer::FORMAT_RACK
-        inject_to_rack(span, carrier)
+        inject_to_rack(span_context, carrier)
       else
         warn 'Unknown inject format'
       end
     end
 
-    # Extract a span from a carrier
-    # @param operation_name [String]
+    # Extract a SpanContext from a carrier
     # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
     # @param carrier [Hash]
-    # @return [Span]
-    def extract(operation_name, format, carrier)
+    # @return [SpanContext] the extracted SpanContext or nil if none could be found
+    def extract(format, carrier)
       case format
       when LightStep::Tracer::FORMAT_TEXT_MAP
-        extract_from_text_map(operation_name, carrier)
+        extract_from_text_map(carrier)
       when LightStep::Tracer::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
       when LightStep::Tracer::FORMAT_RACK
-        extract_from_rack(operation_name, carrier)
+        extract_from_rack(carrier)
       else
         warn 'Unknown join format'
         nil
@@ -192,31 +180,22 @@ module LightStep
     DEFAULT_MAX_SPAN_RECORDS = 1000
     MIN_MAX_SPAN_RECORDS = 1
 
-    def inject_to_text_map(span, carrier)
-      carrier[CARRIER_SPAN_ID] = span.span_context.id
-      carrier[CARRIER_TRACE_ID] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+    def inject_to_text_map(span_context, carrier)
+      carrier[CARRIER_SPAN_ID] = span_context.id
+      carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
       carrier[CARRIER_SAMPLED] = 'true'
 
-      span.span_context.baggage.each do |key, value|
+      span_context.baggage.each do |key, value|
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
     end
 
-    def extract_from_text_map(operation_name, carrier)
+    def extract_from_text_map(carrier)
       # If the carrier does not have both the span_id and trace_id key
       # skip the processing and just return a normal span
       if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
-        return start_span(operation_name)
+        return nil
       end
-
-      span = Span.new(
-        tracer: self,
-        operation_name: operation_name,
-        start_micros: LightStep.micros(Time.now),
-        child_of_id: carrier[CARRIER_SPAN_ID],
-        trace_id: carrier[CARRIER_TRACE_ID],
-        max_log_records: max_log_records
-      )
 
       baggage = carrier.reduce({}) do |baggage, tuple|
         key, value = tuple
@@ -226,17 +205,19 @@ module LightStep
         end
         baggage
       end
-      span.set_baggage(baggage)
-
-      span
+      SpanContext.new(
+        id: carrier[CARRIER_SPAN_ID],
+        trace_id: carrier[CARRIER_TRACE_ID],
+        baggage: baggage,
+      )
     end
 
-    def inject_to_rack(span, carrier)
-      carrier[CARRIER_SPAN_ID] = span.span_context.id
-      carrier[CARRIER_TRACE_ID] = span.span_context.trace_id unless span.span_context.trace_id.nil?
+    def inject_to_rack(span_context, carrier)
+      carrier[CARRIER_SPAN_ID] = span_context.id
+      carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
       carrier[CARRIER_SAMPLED] = 'true'
 
-      span.span_context.baggage.each do |key, value|
+      span_context.baggage.each do |key, value|
         if key =~ /[^A-Za-z0-9\-_]/
           # TODO: log the error internally
           next
@@ -245,8 +226,8 @@ module LightStep
       end
     end
 
-    def extract_from_rack(operation_name, env)
-      extract_from_text_map(operation_name, env.reduce({}){|memo, tuple|
+    def extract_from_rack(env)
+      extract_from_text_map(env.reduce({}){|memo, tuple|
         raw_header, value = tuple
         header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
 

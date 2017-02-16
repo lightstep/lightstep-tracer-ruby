@@ -1,6 +1,8 @@
 require 'json'
 require 'concurrent'
 
+require 'opentracing'
+
 require 'lightstep/span'
 require 'lightstep/reporter'
 require 'lightstep/transport/http_json'
@@ -9,10 +11,6 @@ require 'lightstep/transport/callback'
 
 module LightStep
   class Tracer
-    FORMAT_TEXT_MAP = 1
-    FORMAT_BINARY = 2
-    FORMAT_RACK = 3
-
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
@@ -78,16 +76,16 @@ module LightStep
     # Inject a SpanContext into the given carrier
     #
     # @param spancontext [SpanContext]
-    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash]
+    # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY]
+    # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     def inject(span_context, format, carrier)
       child_of = child_of.span_context if (Span === child_of)
       case format
-      when LightStep::Tracer::FORMAT_TEXT_MAP
+      when OpenTracing::FORMAT_TEXT_MAP
         inject_to_text_map(span_context, carrier)
-      when LightStep::Tracer::FORMAT_BINARY
+      when OpenTracing::FORMAT_BINARY
         warn 'Binary inject format not yet implemented'
-      when LightStep::Tracer::FORMAT_RACK
+      when OpenTracing::FORMAT_RACK
         inject_to_rack(span_context, carrier)
       else
         warn 'Unknown inject format'
@@ -95,17 +93,17 @@ module LightStep
     end
 
     # Extract a SpanContext from a carrier
-    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash]
+    # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY, OpenTracing::FORMAT_RACK]
+    # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     # @return [SpanContext] the extracted SpanContext or nil if none could be found
     def extract(format, carrier)
       case format
-      when LightStep::Tracer::FORMAT_TEXT_MAP
+      when OpenTracing::FORMAT_TEXT_MAP
         extract_from_text_map(carrier)
-      when LightStep::Tracer::FORMAT_BINARY
+      when OpenTracing::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
-      when LightStep::Tracer::FORMAT_RACK
+      when OpenTracing::FORMAT_RACK
         extract_from_rack(carrier)
       else
         warn 'Unknown join format'

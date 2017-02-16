@@ -304,13 +304,13 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1.span_context, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+    tracer.inject(span1.span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+    span_ctx = tracer.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
     expect(span_ctx.id).to eq(span1.span_context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
@@ -328,7 +328,7 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1.span_context, LightStep::Tracer::FORMAT_RACK, carrier)
+    tracer.inject(span1.span_context, OpenTracing::FORMAT_RACK, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
@@ -342,7 +342,7 @@ describe LightStep do
       memo
     end
 
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, carrier)
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
     expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
     expect(span_ctx.id).to eq(span1.span_context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
@@ -352,13 +352,13 @@ describe LightStep do
     expect(span_ctx.baggage['case-sensitivity-underscores']).to eq('value')
 
     # We need both a TRACEID and SPANID.
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
     expect(span_ctx).to be_nil
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
     expect(span_ctx).to be_nil
 
     # We need both a TRACEID and SPANID; this has both so it should work.
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
     expect(span_ctx.id).to eq('abc123')
     expect(span_ctx.trace_id).to eq('bcd234')
 

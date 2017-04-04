@@ -149,7 +149,10 @@ module LightStep
       raise ConfigurationError, "component_name must be a string" unless String === component_name
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      transport = Transport::HTTPJSON.new(access_token: access_token) if !access_token.nil?
+      if transport.nil? and !access_token.nil?
+        transport = Transport::HTTPJSON.new(access_token: access_token)
+      end
+
       raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
       raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
 

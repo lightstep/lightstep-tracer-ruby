@@ -1,5 +1,6 @@
 require 'bundler/setup'
 require 'lightstep'
+require 'opentracing'
 
 require 'rack'
 require 'rack/server'
@@ -19,7 +20,7 @@ class Router
 
     client = Net::HTTP.new("localhost", "9002")
     req = Net::HTTP::Post.new("/")
-    @tracer.inject(span.span_context, LightStep::Tracer::FORMAT_RACK, req)
+    @tracer.inject(span.span_context, OpenTracing::FORMAT_RACK, req)
     res = client.request(req)
 
     span.log(event: "application_response", response: res.to_s)
@@ -36,7 +37,7 @@ class App
   end
 
   def call(env)
-    wire_ctx = @tracer.extract(LightStep::Tracer::FORMAT_RACK, env)
+    wire_ctx = @tracer.extract(OpenTracing::FORMAT_RACK, env)
     span = @tracer.start_span("app_call", child_of: wire_ctx)
     puts "child  #{span.to_h[:trace_guid]}"
     span.log(event: "application", env: env)

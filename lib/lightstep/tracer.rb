@@ -14,7 +14,7 @@ module LightStep
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
-    attr_reader :access_token, :guid
+    attr_reader :access_token
 
     # Initialize a new tracer. Either an access_token or a transport must be
     # provided. A component_name is always required.
@@ -141,6 +141,10 @@ module LightStep
     def finish_span(span)
       return unless enabled?
       @reporter.add_span(span)
+    end
+
+    def guid
+      @guid ||= LightStep.guid
     end
 
     protected

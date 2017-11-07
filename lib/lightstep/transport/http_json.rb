@@ -1,3 +1,4 @@
+require 'thread'
 require 'net/http'
 require 'lightstep/transport/base'
 
@@ -33,20 +34,26 @@ module LightStep
         raise Tracer::ConfigurationError, "access_token must be a string" unless String === access_token
         raise Tracer::ConfigurationError, "access_token cannot be blank"  if access_token.empty?
         @access_token = access_token
+
+        @mutex = Mutex.new
+        @https = Net::HTTP.new(@host, @port)
+        @https.use_ssl = @encryption == ENCRYPTION_TLS
       end
 
       # Queue a report for sending
       def report(report)
         p report if @verbose >= 3
 
-        https = Net::HTTP.new(@host, @port)
-        https.use_ssl = @encryption == ENCRYPTION_TLS
         req = Net::HTTP::Post.new('/api/v0/reports')
         req['LightStep-Access-Token'] = @access_token
         req['Content-Type'] = 'application/json'
         req['Connection'] = 'keep-alive'
+
         req.body = report.to_json
-        res = https.request(req)
+
+        @mutex.synchronize do
+          res = @https.request(req)
+        end
 
         puts res.to_s if @verbose >= 3
 

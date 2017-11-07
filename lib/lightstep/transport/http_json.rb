@@ -1,3 +1,4 @@
+require 'thread'
 require 'net/http'
 require 'lightstep/transport/base'
 
@@ -57,6 +58,8 @@ module LightStep
         raise Tracer::ConfigurationError, 'access_token cannot be blank'  if access_token.empty?
         @access_token = access_token
         @logger = logger || LightStep.logger
+
+        @mutex = Mutex.new
       end
 
       ##
@@ -66,10 +69,11 @@ module LightStep
         @logger.info report if @verbose >= 3
 
         req = build_request(report)
-        res = connection.request(req)
+        res = @mutex.synchronize do
+          connection.request(req)
+        end
 
-        @logger.info res.to_s if @verbose >= 3
-
+         @logger.info res.to_s if @verbose >= 3
         nil
       end
 

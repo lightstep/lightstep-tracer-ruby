@@ -31,6 +31,7 @@ module LightStep
       # @param keep_alive_timeout [Integer]
       # @param logger [Logger]
       #
+      # @return [HTTPJSON]
       def initialize(
         host: LIGHTSTEP_HOST,
         port: LIGHTSTEP_PORT,
@@ -41,7 +42,7 @@ module LightStep
         open_timeout: 20,
         read_timeout: 20,
         continue_timeout: nil,
-        keep_alive_timeout: 2,
+        keep_alive_timeout: 5,
         logger: nil
       )
         @host = host
@@ -53,12 +54,18 @@ module LightStep
         @read_timeout = read_timeout.to_i
         @continue_timeout = continue_timeout
         @keep_alive_timeout = keep_alive_timeout.to_i
+        @verbose = verbose
 
         raise Tracer::ConfigurationError, 'access_token must be a string' unless access_token.is_a?(String)
         raise Tracer::ConfigurationError, 'access_token cannot be blank'  if access_token.empty?
         @access_token = access_token
         @logger = logger || LightStep.logger
 
+        # This mutex protects the use of our Net::HTTP instance which we
+        # maintain as a long lived connection. While a Lightstep::Transport is
+        # typically called only from within the reporting thread, there are
+        # some situations where this can be bypassed (directly calling `flush`
+        # for example)
         @mutex = Mutex.new
       end
 
@@ -104,6 +111,10 @@ module LightStep
           @connection.read_timeout = @read_timeout
           @connection.continue_timeout = @continue_timeout
           @connection.keep_alive_timeout = @keep_alive_timeout
+          # Typically, keep-alive for Net:HTTP is handled inside a start block,
+          # but that's awkward with our threading model. By starting it manually,
+          # once, the TCP connection should remain open for multiple report calls.
+          @connection.start unless @connection.started?
         end
         @connection
       end

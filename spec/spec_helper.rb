@@ -18,6 +18,7 @@
 require 'simplecov'
 SimpleCov.start
 require 'pp'
+require 'active_support'
 require 'lightstep'
 require 'timecop'
 require 'helpers/rack_helpers'

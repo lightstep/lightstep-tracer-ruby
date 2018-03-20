@@ -24,4 +24,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'bump', '~> 0.5'
   spec.add_development_dependency 'simplecov', '~> 0.12.0'
   spec.add_development_dependency 'timecop', '~> 0.8.0'
+  spec.add_development_dependency 'activesupport', '~> 5.1'
 end

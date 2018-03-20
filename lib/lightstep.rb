@@ -43,5 +43,6 @@ module LightStep
   end
 end
 
+require 'lightstep/instrumentation'
 require 'lightstep/tracer'
 require 'lightstep/global_tracer'

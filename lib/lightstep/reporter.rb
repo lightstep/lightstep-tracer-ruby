@@ -74,10 +74,12 @@ module LightStep
       @report_start_time = now
 
       begin
-        @transport.report(report_request)
+        LightStep.instrument("flush", report: report_request) do
+          @transport.report(report_request)
+        end
       rescue
-	# an error occurs, add the previous dropped_spans and count of spans
-	# that would have been recorded
+        # an error occurs, add the previous dropped_spans and count of spans
+        # that would have been recorded
         @dropped_spans.increment(dropped_spans + span_records.length)
       end
     end

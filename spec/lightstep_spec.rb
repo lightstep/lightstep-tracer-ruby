@@ -1,3 +1,4 @@
+require 'active_support'
 require 'spec_helper'
 
 describe LightStep do
@@ -670,6 +671,26 @@ describe LightStep do
     records = result[:span_records]
     expect(records[0][:span_name]).to eq("5")
     expect(records[1][:span_name]).to eq("[:foo]")
+  end
+
+  it 'should delivery instrumentation notifications' do
+    tracer = init_test_tracer
+    event_payload = nil
+
+    tracer.start_span('span').finish
+
+    subscription = LightStep.instrumenter.subscribe "flush.lightstep" do |name, start_time, end_time, id, payload|
+      event_payload = payload
+    end
+
+    begin
+      tracer.flush
+    ensure
+      LightStep.instrumenter.unsubscribe subscription
+    end
+
+    expect(event_payload).to be_a(Hash)
+    expect(event_payload[:report][:span_records].length).to eq(1)
   end
 
   describe '#scope_manager' do

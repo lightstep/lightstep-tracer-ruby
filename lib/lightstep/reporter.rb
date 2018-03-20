@@ -78,7 +78,9 @@ module LightStep
       @report_start_time = now
 
       begin
-        @transport.report(report_request)
+        LightStep.instrument("flush", report: report_request) do
+          @transport.report(report_request)
+        end
       rescue StandardError => e
         LightStep.logger.error "LightStep error reporting to collector: #{e.message}"
         # an error occurs, add the previous dropped_spans and count of spans

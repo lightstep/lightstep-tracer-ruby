@@ -19,6 +19,10 @@ module LightStep
     # @param operation_name [String] the operation name of this span. If it's
     #        not a String it will be encoded with to_s.
     # @param child_of [SpanContext] the parent SpanContext (per child_of)
+    # @param references [Array<SpanContext>] An array of SpanContexts
+    #   that identify what Spans this Span follows from causally. Presently
+    #   only one reference is supported, and cannot be provided in addition to
+    #   a child_of.
     # @param start_micros [Numeric] start time of the span in microseconds
     # @param tags [Hash] initial key:value tags (per set_tag) for the Span
     # @param max_log_records [Numeric] maximum allowable number of log records
@@ -28,11 +32,11 @@ module LightStep
       tracer:,
       operation_name:,
       child_of: nil,
+      references: [],
       start_micros:,
       tags: nil,
       max_log_records:
     )
-      child_of = child_of.span_context if (Span === child_of)
       @tags = Concurrent::Hash.new
       @tags.update(tags) unless tags.nil?
       @log_records = Concurrent::Array.new
@@ -43,12 +47,16 @@ module LightStep
       self.operation_name = operation_name.to_s
       self.start_micros = start_micros
 
-      trace_id = (SpanContext === child_of ? child_of.trace_id : LightStep.guid)
-      @span_context = SpanContext.new(id: LightStep.guid, trace_id: trace_id)
+      ref = child_of ? child_of : references
+      ref = ref[0] if (Array === ref)
+      ref = ref.span_context if (Span === ref)
 
-      if SpanContext === child_of
-        set_baggage(child_of.baggage)
-        set_tag(:parent_span_guid, child_of.id)
+      if SpanContext === ref
+        @span_context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id)
+        set_baggage(ref.baggage)
+        set_tag(:parent_span_guid, ref.id)
+      else
+        @span_context = SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid)
       end
     end
 

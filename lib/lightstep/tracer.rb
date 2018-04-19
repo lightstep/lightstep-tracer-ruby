@@ -79,7 +79,6 @@ module LightStep
     # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY]
     # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     def inject(span_context, format, carrier)
-      child_of = child_of.span_context if (Span === child_of)
       case format
       when OpenTracing::FORMAT_TEXT_MAP
         inject_to_text_map(span_context, carrier)

@@ -59,14 +59,19 @@ module LightStep
     # @param child_of [SpanContext] SpanContext that acts as a parent to
     #        the newly-started Span. If a Span instance is provided, its
     #        .span_context is automatically substituted.
+    # @param references [Array<SpanContext>] An array of SpanContexts that
+    #         identify any parent SpanContexts of newly-started Span. If Spans
+    #         are provided, their .span_context is automatically substituted.
     # @param start_time [Time] When the Span started, if not now
     # @param tags [Hash] Tags to assign to the Span at start time
     # @return [Span]
-    def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
+    def start_span(operation_name, child_of: nil, references: [], start_time: nil, tags: nil)
+
       Span.new(
         tracer: self,
         operation_name: operation_name,
         child_of: child_of,
+        references: references,
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
         max_log_records: max_log_records,
@@ -79,7 +84,6 @@ module LightStep
     # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY]
     # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     def inject(span_context, format, carrier)
-      child_of = child_of.span_context if (Span === child_of)
       case format
       when OpenTracing::FORMAT_TEXT_MAP
         inject_to_text_map(span_context, carrier)

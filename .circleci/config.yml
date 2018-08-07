@@ -11,7 +11,12 @@ jobs:
       #       - gem-cache-v1-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
       #       - gem-cache-v1-{{ .Branch }}-
       #       - gem-cache-v1-
-      - run: BUNDLE_PATH=.bundler_cache bundle
+      - run:
+          name: "set up environment"
+          command: |
+            echo 'export BUNDLE_PATH="$HOME/project/.bundler_cache"' >> $BASH_ENV
+            source $BASH_ENV
+      - run: bundle
       - save_cache:
           paths:
             - ~/project/.bundler_cache

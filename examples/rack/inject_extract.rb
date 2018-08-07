@@ -60,7 +60,7 @@ end
 
 loop do
   begin
-    p Net::HTTP.get(URI("http://localhost:9001/"))
+    p Net::HTTP.get(URI("http://127.0.0.1:9001/"))
     break
   rescue Errno::ECONNREFUSED
     sleep 0.05

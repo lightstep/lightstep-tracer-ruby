@@ -14,7 +14,7 @@ jobs:
       - run: bundle
       - save_cache:
           paths:
-            - ~/.bundle
+            - /usr/local/bundle
           key: gem-cache-v1-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
       - run: make test
 

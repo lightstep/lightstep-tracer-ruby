@@ -57,7 +57,10 @@ module LightStep
 
       span_records = @span_records.slice!(0, @span_records.length)
       dropped_spans = 0
-      @dropped_spans.update{|old| dropped_spans = old; 0 }
+      @dropped_spans.update do |old|
+        dropped_spans = old
+        0
+      end
 
       report_request = {
         runtime: @runtime,
@@ -65,9 +68,10 @@ module LightStep
         youngest_micros: now,
         span_records: span_records,
         internal_metrics: {
-	  counts: [
-	    {name: "spans.dropped", int64_value: dropped_spans},
-	  ]
+          counts: [{
+            name: 'spans.dropped',
+            int64_value: dropped_spans
+          }]
         }
       }
 
@@ -75,9 +79,10 @@ module LightStep
 
       begin
         @transport.report(report_request)
-      rescue
-	# an error occurs, add the previous dropped_spans and count of spans
-	# that would have been recorded
+      rescue StandardError => e
+        LightStep.logger.error "LightStep error reporting to collector: #{e.message}"
+        # an error occurs, add the previous dropped_spans and count of spans
+        # that would have been recorded
         @dropped_spans.increment(dropped_spans + span_records.length)
       end
     end
@@ -103,8 +108,8 @@ module LightStep
             sleep(@period)
             flush
           end
-        rescue => ex
-          # TODO: internally log the exception
+        rescue StandardError => e
+          LightStep.logger.error "LightStep failed to report spans: #{e.message}"
         end
       end
     end

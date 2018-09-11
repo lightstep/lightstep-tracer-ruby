@@ -11,7 +11,7 @@ LightStep.configure(component_name: 'lightstep/ruby/example', access_token: acce
 puts 'Starting operation...'
 span = LightStep.start_span('my_span')
 thread1 = Thread.new do
-  for i in 1..10
+  (1..10).each do |i|
     sleep(0.15)
     puts "Logging event #{i}..."
     span.log(event: 'hello world', count: i)
@@ -19,7 +19,7 @@ thread1 = Thread.new do
 end
 thread2 = Thread.new do
   current = 1
-  for i in 1..16
+  (1..16).each do |i|
     child = LightStep.start_span('my_child', child_of: span.span_context)
     sleep(0.1)
     current *= 2

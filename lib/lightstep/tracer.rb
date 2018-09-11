@@ -66,7 +66,6 @@ module LightStep
     # @param tags [Hash] Tags to assign to the Span at start time
     # @return [Span]
     def start_span(operation_name, child_of: nil, references: [], start_time: nil, tags: nil)
-
       Span.new(
         tracer: self,
         operation_name: operation_name,
@@ -150,7 +149,7 @@ module LightStep
     protected
 
     def configure(component_name:, access_token: nil, transport: nil, tags: {})
-      raise ConfigurationError, "component_name must be a string" unless String === component_name
+      raise ConfigurationError, "component_name must be a string" unless component_name.is_a?(String)
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
       if transport.nil? and !access_token.nil?
@@ -234,7 +233,7 @@ module LightStep
     def extract_from_rack(env)
       extract_from_text_map(env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
+        header = raw_header.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
         memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
         memo

@@ -6,7 +6,7 @@ describe LightStep do
   end
 
   def init_callback_tracer(callback)
-    tracer = LightStep::Tracer.new(
+    LightStep::Tracer.new(
       component_name: 'lightstep/ruby/spec',
       transport: LightStep::Transport::Callback.new(callback: callback)
     )
@@ -215,7 +215,7 @@ describe LightStep do
     file = File.open('./lib/lightstep.rb', 'r')
     data = [
       nil,
-      TRUE, FALSE,
+      true, false,
       0, -1, 1,
       0.0, -1.0, 1.0,
       '', 'a', 'a longer string',

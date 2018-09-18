@@ -1,0 +1,48 @@
+AllCops:
+  Exclude:
+    - spec/**/*
+    - .bundle/**/*
+    - bin/**/*
+    - vendor/**/*
+    - tmp/**/*
+    - log/**/*
+    - Rakefile
+    - lightstep.gemspec
+
+Lint/AmbiguousOperator:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Metrics/AbcSize:
+  Max: 147
+
+Metrics/BlockNesting:
+  Max: 4
+
+# Configuration parameters: CountComments.
+Metrics/ClassLength:
+  Max: 406
+
+Metrics/CyclomaticComplexity:
+  Max: 24
+
+# Configuration parameters: AllowHeredoc, AllowURI, URISchemes.
+# URISchemes: http, https
+Metrics/LineLength:
+  Enabled: false
+
+# Configuration parameters: CountComments.
+Metrics/MethodLength:
+  Max: 88
+
+# Configuration parameters: CountComments.
+Metrics/ModuleLength:
+  Max: 1000
+
+Performance/RedundantBlockCall:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
+  Enabled: false

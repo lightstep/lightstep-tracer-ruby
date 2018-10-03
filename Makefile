@@ -8,6 +8,7 @@ test:
 	ruby example.rb
 	ruby examples/fork_children/main.rb
 	ruby examples/rack/inject_extract.rb
+	ruby examples/rack/hello.rb
 
 benchmark:
 	ruby benchmark/bench.rb

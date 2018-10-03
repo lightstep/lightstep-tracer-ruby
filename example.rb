@@ -4,9 +4,9 @@ SimpleCov.command_name 'example.rb'
 SimpleCov.start
 require 'lightstep'
 
-access_token = '{your_access_token}'
+access_token = '61c90a839a46c996e79c56afa1f116b8'
 
-LightStep.configure(component_name: 'lightstep/ruby/example', access_token: access_token)
+LightStep.configure(component_name: 'lightstep/ruby/example', access_token: access_token, transport: Transport::HTTPPROTO.new(access_token: access_token))
 
 puts 'Starting operation...'
 span = LightStep.start_span('my_span')

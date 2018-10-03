@@ -6,6 +6,7 @@ require 'opentracing'
 require 'lightstep/span'
 require 'lightstep/reporter'
 require 'lightstep/transport/http_json'
+require 'lightstep/transport/http_proto'
 require 'lightstep/transport/nil'
 require 'lightstep/transport/callback'
 

@@ -23,3 +23,9 @@ bump-version:
 
 publish: build test benchmark bump-version
 	gem push lightstep-`ruby scripts/version.rb`.gem
+
+# LightStep-specific: rebuilds the LightStep protobuf files.
+proto:
+	protoc --proto_path "$(PWD)/../googleapis:$(PWD)/../lightstep-tracer-common/" \
+		--ruby_out="$(PWD)/lib/lightstep" \
+		collector.proto

@@ -28,8 +28,8 @@ describe LightStep do
     tracer = init_test_tracer
     parent_span = tracer.start_span('parent_span')
     parent_span.set_baggage(test: 'value')
-    child_span = tracer.start_span('child_span', child_of: parent_span.span_context)
-    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+    child_span = tracer.start_span('child_span', child_of: parent_span.context)
+    expect(child_span.context.baggage).to eq(parent_span.context.baggage)
   end
 
   it 'should inherit baggage from parent spans' do
@@ -96,7 +96,7 @@ describe LightStep do
   it 'should not allow SpanContext modification' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    context = span.span_context
+    context = span.context
     expect{context.baggage['foo'] = 'bar'}.to raise_error(RuntimeError)
     expect{context.id.slice!(0,1)}.to raise_error(RuntimeError)
     expect{context.trace_id.slice!(0,1)}.to raise_error(RuntimeError)
@@ -140,7 +140,7 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
 
-    expect(span.span_context.id).to be_an_instance_of String
+    expect(span.context.id).to be_an_instance_of String
     span.finish
   end
 
@@ -181,21 +181,21 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1.span_context) }
-    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2.span_context) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1.context) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2.context) }
 
     children1.each do |child|
-      expect(child.span_context.trace_id).to be_an_instance_of String
-      expect(child.span_context.trace_id).to eq(parent1.span_context.trace_id)
-      expect(child.span_context.trace_id).not_to eq(parent2.span_context.trace_id)
-      expect(child.tags[:parent_span_guid]).to eq(parent1.span_context.id)
+      expect(child.context.trace_id).to be_an_instance_of String
+      expect(child.context.trace_id).to eq(parent1.context.trace_id)
+      expect(child.context.trace_id).not_to eq(parent2.context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent1.context.id)
     end
 
     children2.each do |child|
-      expect(child.span_context.trace_id).to be_an_instance_of String
-      expect(child.span_context.trace_id).to eq(parent2.span_context.trace_id)
-      expect(child.span_context.trace_id).not_to eq(parent1.span_context.trace_id)
-      expect(child.tags[:parent_span_guid]).to eq(parent2.span_context.id)
+      expect(child.context.trace_id).to be_an_instance_of String
+      expect(child.context.trace_id).to eq(parent2.context.trace_id)
+      expect(child.context.trace_id).not_to eq(parent1.context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent2.context.id)
     end
 
     children1.each(&:finish)
@@ -205,7 +205,7 @@ describe LightStep do
 
     (children1.concat children2).each do |child|
       thrift_data = child.to_h
-      expect(thrift_data[:trace_guid]).to eq(child.span_context.trace_id)
+      expect(thrift_data[:trace_guid]).to eq(child.context.trace_id)
     end
   end
 
@@ -255,10 +255,10 @@ describe LightStep do
   it 'should handle nested spans' do
     tracer = init_test_tracer
     s0 = tracer.start_span('s0')
-    s1 = tracer.start_span('s1', child_of: s0.span_context)
-    s2 = tracer.start_span('s2', child_of: s1.span_context)
-    s3 = tracer.start_span('s3', child_of: s2.span_context)
-    s4 = tracer.start_span('s4', child_of: s3.span_context)
+    s1 = tracer.start_span('s1', child_of: s0.context)
+    s2 = tracer.start_span('s2', child_of: s1.context)
+    s3 = tracer.start_span('s3', child_of: s2.context)
+    s4 = tracer.start_span('s4', child_of: s3.context)
     s4.finish
     s3.finish
     s2.finish
@@ -344,15 +344,16 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1.span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_TEXT_MAP, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
     span_ctx = tracer.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
-    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
-    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
+    expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
     expect(span_ctx.baggage['umbrella']).to eq('golf')
 
@@ -368,9 +369,10 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1.span_context, OpenTracing::FORMAT_RACK, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
     expect(carrier['ot-baggage-unsafeheader']).to be_nil
@@ -383,8 +385,8 @@ describe LightStep do
     end
 
     span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
-    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
-    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
+    expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
     expect(span_ctx.baggage['umbrella']).to eq('golf')
     expect(span_ctx.baggage['unsafe!@#$%$^&header']).to be_nil

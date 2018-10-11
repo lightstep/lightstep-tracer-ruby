@@ -6,7 +6,7 @@ describe LightStep do
   end
 
   def init_callback_tracer(callback)
-    tracer = LightStep::Tracer.new(
+    LightStep::Tracer.new(
       component_name: 'lightstep/ruby/spec',
       transport: LightStep::Transport::Callback.new(callback: callback)
     )
@@ -30,6 +30,46 @@ describe LightStep do
     parent_span.set_baggage(test: 'value')
     child_span = tracer.start_span('child_span', child_of: parent_span.context)
     expect(child_span.context.baggage).to eq(parent_span.context.baggage)
+  end
+
+  it 'should inherit baggage from parent spans' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', child_of: parent_span)
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+  end
+
+  it 'should inherit baggage from a single referenced span context (follows_from)' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', references: parent_span)
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+  end
+
+  it 'should inherit baggage from referenced span contexts (follows_from)' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', references: [parent_span.span_context])
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+  end
+
+  it 'should inherit baggage from a single referenced span (follows_from)' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', references: parent_span)
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+  end
+
+  it 'should inherit baggage from referenced spans (follows_from)' do
+    tracer = init_test_tracer
+    parent_span = tracer.start_span('parent_span')
+    parent_span.set_baggage(test: 'value')
+    child_span = tracer.start_span('child_span', references: [parent_span])
+    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
   end
 
   it 'should allow operation_name updates' do
@@ -175,7 +215,7 @@ describe LightStep do
     file = File.open('./lib/lightstep.rb', 'r')
     data = [
       nil,
-      TRUE, FALSE,
+      true, false,
       0, -1, 1,
       0.0, -1.0, 1.0,
       '', 'a', 'a longer string',
@@ -304,13 +344,14 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1.context, LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_TEXT_MAP, carrier)
+    span_ctx = tracer.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(span_ctx.trace_id).to eq(span1.context.trace_id)
     expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
@@ -328,7 +369,8 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1.context, LightStep::Tracer::FORMAT_RACK, carrier)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
     expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
     expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
@@ -342,7 +384,7 @@ describe LightStep do
       memo
     end
 
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, carrier)
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
     expect(span_ctx.trace_id).to eq(span1.context.trace_id)
     expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
@@ -352,13 +394,13 @@ describe LightStep do
     expect(span_ctx.baggage['case-sensitivity-underscores']).to eq('value')
 
     # We need both a TRACEID and SPANID.
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
     expect(span_ctx).to be_nil
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
     expect(span_ctx).to be_nil
 
     # We need both a TRACEID and SPANID; this has both so it should work.
-    span_ctx = tracer.extract(LightStep::Tracer::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
+    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
     expect(span_ctx.id).to eq('abc123')
     expect(span_ctx.trace_id).to eq('bcd234')
 

@@ -1,6 +1,8 @@
 require 'json'
 require 'concurrent'
 
+require 'opentracing'
+
 require 'lightstep/span'
 require 'lightstep/reporter'
 require 'lightstep/transport/http_json'
@@ -9,10 +11,6 @@ require 'lightstep/transport/callback'
 
 module LightStep
   class Tracer
-    FORMAT_TEXT_MAP = 1
-    FORMAT_BINARY = 2
-    FORMAT_RACK = 3
-
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
@@ -61,14 +59,18 @@ module LightStep
     # @param child_of [SpanContext] SpanContext that acts as a parent to
     #        the newly-started Span. If a Span instance is provided, its
     #        .span_context is automatically substituted.
+    # @param references [Array<SpanContext>] An array of SpanContexts that
+    #         identify any parent SpanContexts of newly-started Span. If Spans
+    #         are provided, their .span_context is automatically substituted.
     # @param start_time [Time] When the Span started, if not now
     # @param tags [Hash] Tags to assign to the Span at start time
     # @return [Span]
-    def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
+    def start_span(operation_name, child_of: nil, references: [], start_time: nil, tags: nil)
       Span.new(
         tracer: self,
         operation_name: operation_name,
         child_of: child_of,
+        references: references,
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
         max_log_records: max_log_records,
@@ -78,16 +80,15 @@ module LightStep
     # Inject a SpanContext into the given carrier
     #
     # @param spancontext [SpanContext]
-    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash]
+    # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY]
+    # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     def inject(span_context, format, carrier)
-      child_of = child_of.span_context if (Span === child_of)
       case format
-      when LightStep::Tracer::FORMAT_TEXT_MAP
+      when OpenTracing::FORMAT_TEXT_MAP
         inject_to_text_map(span_context, carrier)
-      when LightStep::Tracer::FORMAT_BINARY
+      when OpenTracing::FORMAT_BINARY
         warn 'Binary inject format not yet implemented'
-      when LightStep::Tracer::FORMAT_RACK
+      when OpenTracing::FORMAT_RACK
         inject_to_rack(span_context, carrier)
       else
         warn 'Unknown inject format'
@@ -95,17 +96,17 @@ module LightStep
     end
 
     # Extract a SpanContext from a carrier
-    # @param format [LightStep::Tracer::FORMAT_TEXT_MAP, LightStep::Tracer::FORMAT_BINARY]
-    # @param carrier [Hash]
+    # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY, OpenTracing::FORMAT_RACK]
+    # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     # @return [SpanContext] the extracted SpanContext or nil if none could be found
     def extract(format, carrier)
       case format
-      when LightStep::Tracer::FORMAT_TEXT_MAP
+      when OpenTracing::FORMAT_TEXT_MAP
         extract_from_text_map(carrier)
-      when LightStep::Tracer::FORMAT_BINARY
+      when OpenTracing::FORMAT_BINARY
         warn 'Binary join format not yet implemented'
         nil
-      when LightStep::Tracer::FORMAT_RACK
+      when OpenTracing::FORMAT_RACK
         extract_from_rack(carrier)
       else
         warn 'Unknown join format'
@@ -148,10 +149,13 @@ module LightStep
     protected
 
     def configure(component_name:, access_token: nil, transport: nil, tags: {})
-      raise ConfigurationError, "component_name must be a string" unless String === component_name
+      raise ConfigurationError, "component_name must be a string" unless component_name.is_a?(String)
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
-      transport = Transport::HTTPJSON.new(access_token: access_token) if !access_token.nil?
+      if transport.nil? and !access_token.nil?
+        transport = Transport::HTTPJSON.new(access_token: access_token)
+      end
+
       raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
       raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
 
@@ -229,7 +233,7 @@ module LightStep
     def extract_from_rack(env)
       extract_from_text_map(env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
+        header = raw_header.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
         memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
         memo

@@ -558,4 +558,87 @@ describe LightStep do
     expect(records[0][:span_name]).to eq("5")
     expect(records[1][:span_name]).to eq("[:foo]")
   end
+
+  describe '#scope_manager' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should return a scope manager' do
+      expect(tracer.scope_manager).to be_an_instance_of(LightStep::ScopeManager)
+    end
+
+    context 'when the scope manager exists' do
+      before(:each) do
+        @manager = tracer.scope_manager
+      end
+
+      it 'should return the same scope manager' do
+        expect(tracer.scope_manager).to eq(@manager)
+      end
+    end
+  end
+
+  describe '#start_active_span' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should set the active scope' do
+      span = tracer.start_active_span('some-operation')
+
+      actual = tracer.scope_manager.active
+      expect(actual).to be_an_instance_of(LightStep::Scope)
+      expect(actual.span.to_h[:span_name]).to eq('some-operation')
+    end
+
+    it 'should yield the active scope when given a block' do
+      tracer.start_active_span('some-operation') do |scope|
+        expect(scope).to be_an_instance_of(LightStep::Scope)
+
+        expected_scope = tracer.scope_manager.active
+        expect(scope).to eq(expected_scope)
+        expect(scope.span.to_h[:span_name]).to eq('some-operation')
+      end
+    end
+
+    context 'when there is an active scope' do
+      before(:each) do
+        @scope = tracer.start_active_span('some-operation')
+        @parent_span = @scope.span
+      end
+
+      it 'should create a child_of reference to the active scope' do
+        scope = tracer.start_active_span('child-operation')
+        expect(scope.span.tags[:parent_span_guid]).to eq(@parent_span.context.id)
+      end
+
+      context 'when ignore_active_scope is true' do
+        it 'should not create a child_of reference to the active scope' do
+          scope = tracer.start_active_span('child-operation', ignore_active_scope: true)
+          expect(scope.span.tags[:parent_span_guid]).not_to eq(@parent_span.context.id)
+        end
+      end
+    end
+
+    xit 'should create a span with the given operation_name'
+    xit 'should create a span with the given child_of'
+    xit 'should create a span with the given references'
+    xit 'should create a span with the given start_time'
+    xit 'should create a span with the given tags'
+  end
+
+  describe '#active_span' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should return nil' do
+      expect(tracer.active_span).to be_nil
+    end
+
+    context 'when there is an active scope' do
+      before(:each) do
+        scope = tracer.start_active_span('some-operation')
+      end
+
+      it 'should return the active span' do
+        expect(tracer.active_span.to_h[:span_name]).to eq('some-operation')
+      end
+    end
+  end
 end

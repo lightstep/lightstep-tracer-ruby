@@ -1,15 +1,22 @@
 module LightStep
   class ScopeManager
+    def initialize
+      @scopes = []
+    end
+
     def activate(span:, finish_on_close: true)
-      @scope = LightStep::Scope.new(manager: self, span: span, finish_on_close: finish_on_close)
+      return active if active && active.span == span
+      scope = LightStep::Scope.new(manager: self, span: span, finish_on_close: finish_on_close)
+      @scopes << scope
+      scope
     end
 
     def active
-      @scope if @scope
+      @scopes.last if @scopes
     end
 
     def deactivate
-      @scope = nil
+      @scopes.pop
     end
   end
 end

@@ -38,13 +38,23 @@ describe 'LightStep:ScopeManager' do
       let(:span) { instance_spy(LightStep::Span) }
 
       before(:each) do
-        scope_manager.activate(span: span)
+        @scope = scope_manager.activate(span: span)
       end
 
       it 'should return the active scope' do
         scope = scope_manager.active
         expect(scope).not_to be_nil
         expect(scope.span).to eq(span)
+      end
+
+      context 'when the active scope was closed' do
+        before(:each) do
+          @scope.close
+        end
+
+        it 'should return nil' do
+          expect(scope_manager.active).to be_nil
+        end
       end
     end
   end

@@ -111,6 +111,8 @@ module LightStep
       end
     end
 
+    # Returns the span from the active scope, if any.
+    #
     # @return [Span, nil] the active span. This is a shorthand for
     #   `scope_manager.active.span`, and nil will be returned if
     #   Scope#active is nil.

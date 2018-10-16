@@ -12,7 +12,7 @@ module LightStep
     end
 
     def active
-      @scopes.last if @scopes
+      @scopes.last
     end
 
     def deactivate

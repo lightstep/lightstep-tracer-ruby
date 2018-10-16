@@ -107,7 +107,10 @@ module LightStep
       )
 
       scope_manager.activate(span: span, finish_on_close: finish_on_close).tap do |scope|
-        yield scope if block_given?
+        if block_given?
+          yield scope
+          scope.close
+        end
       end
     end
 

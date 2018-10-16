@@ -598,6 +598,33 @@ describe LightStep do
       end
     end
 
+    context 'when a block is given' do
+      before(:each) do
+        tracer.start_active_span('some-operation') do |scope|
+          @scope = scope
+          expect(@scope.span.end_micros).to be_nil
+        end
+      end
+
+      it 'should finish the span' do
+        expect(@scope.span.end_micros).not_to be_nil
+      end
+
+    end
+
+    context 'when finish_on_close is false and a block is given' do
+      before(:each) do
+        tracer.start_active_span('some-operation', finish_on_close: false) do |scope|
+          @scope = scope
+          expect(@scope.span.end_micros).to be_nil
+        end
+      end
+
+      it 'should not finish the span after the block finishes yielding' do
+        expect(@scope.span.end_micros).to be_nil
+      end
+    end
+
     context 'when there is an active scope' do
       before(:each) do
         @scope = tracer.start_active_span('some-operation')

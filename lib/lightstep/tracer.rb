@@ -103,7 +103,8 @@ module LightStep
         child_of: child_of,
         references: references,
         start_time: start_time,
-        tags: tags
+        tags: tags,
+        ignore_active_scope: ignore_active_scope
       )
 
       scope_manager.activate(span: span, finish_on_close: finish_on_close).tap do |scope|
@@ -135,8 +136,14 @@ module LightStep
     #         are provided, their .span_context is automatically substituted.
     # @param start_time [Time] When the Span started, if not now
     # @param tags [Hash] Tags to assign to the Span at start time
+    # @param ignore_active_scope [Boolean] whether to create an implicit
+    #   References#CHILD_OF reference to the ScopeManager#active.
     # @return [Span]
-    def start_span(operation_name, child_of: nil, references: [], start_time: nil, tags: nil)
+    def start_span(operation_name, child_of: nil, references: nil, start_time: nil, tags: nil, ignore_active_scope: false)
+      if child_of.nil? && references.nil? && !ignore_active_scope
+        child_of = active_span
+      end
+
       Span.new(
         tracer: self,
         operation_name: operation_name,

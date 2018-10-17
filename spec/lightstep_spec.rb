@@ -577,8 +577,28 @@ describe LightStep do
     end
   end
 
-  # test that start_span properly gets the active scope's span and sets it as the parent of the new span
-  #
+  describe '#start_span' do
+    let(:tracer) { init_test_tracer }
+
+    context 'when there is an active scope' do
+      before(:each) do
+        @scope = tracer.start_active_span('some-operation')
+        @parent_span = @scope.span
+      end
+
+      it 'should create a child_of reference to the active scope' do
+        span = tracer.start_span('child-operation')
+        expect(span.tags[:parent_span_guid]).to eq(@parent_span.context.id)
+      end
+
+      context 'when ignore_active_scope is true' do
+        it 'should not create a child_of reference to the active scope' do
+          span = tracer.start_span('child-operation', ignore_active_scope: true)
+          expect(span.tags[:parent_span_guid]).not_to eq(@parent_span.context.id)
+        end
+      end
+    end
+  end
 
   describe '#start_active_span' do
     let(:tracer) { init_test_tracer }
@@ -629,20 +649,18 @@ describe LightStep do
     end
 
     context 'when there is an active scope' do
-      before(:each) do
-        @scope = tracer.start_active_span('some-operation')
-        @parent_span = @scope.span
-      end
+      let!(:parent_span) { tracer.start_active_span('some-operation').span }
+      let(:scope) { tracer.start_active_span('child-operation') }
 
       it 'should create a child_of reference to the active scope' do
-        scope = tracer.start_active_span('child-operation')
-        expect(scope.span.tags[:parent_span_guid]).to eq(@parent_span.context.id)
+        expect(scope.span.tags[:parent_span_guid]).to eq(parent_span.context.id)
       end
 
       context 'when ignore_active_scope is true' do
-        it 'should not create a child_of reference to the active scope' do
-          scope = tracer.start_active_span('child-operation', ignore_active_scope: true)
-          expect(scope.span.tags[:parent_span_guid]).not_to eq(@parent_span.context.id)
+        let(:scope) { tracer.start_active_span('child-operation', ignore_active_scope: true) }
+
+        it 'should not create a child_of reference to the active scope', focus: true do
+          expect(scope.span.tags[:parent_span_guid]).not_to eq(parent_span.context.id)
         end
       end
     end

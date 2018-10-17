@@ -55,6 +55,26 @@ describe 'LightStep:ScopeManager' do
         expect(scope_manager.active).to eq(scope)
       end
     end
+
+    it 'should maintain separate scope stacks per thread' do
+      @t1_activated = false
+
+      ts = []
+      ts << Thread.new do
+        scope_manager.activate(span: instance_spy(LightStep::Span))
+        @t1_activated = true
+      end
+
+      ts << Thread.new do
+        while !@t1_activated do
+          sleep 0.1
+        end
+
+        active_scope = scope_manager.active
+        expect(active_scope).to be_nil
+      end
+      ts.map(&:join)
+    end
   end
 
   describe '#active' do

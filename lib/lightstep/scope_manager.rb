@@ -8,10 +8,6 @@ module LightStep
   # ScopeManager#active
   #
   class ScopeManager
-    def initialize
-      @scopes = []
-    end
-
     # Make a span instance active.
     #
     # @param span [Span] the Span that should become active
@@ -22,9 +18,9 @@ module LightStep
     #  returned instance.
     def activate(span:, finish_on_close: true)
       return active if active && active.span == span
-      scope = LightStep::Scope.new(manager: self, span: span, finish_on_close: finish_on_close)
-      @scopes << scope
-      scope
+      LightStep::Scope.new(manager: self, span: span, finish_on_close: finish_on_close).tap do |scope|
+        add_scope(scope)
+      end
     end
 
     # @return [Scope] the currently active Scope which can be used to access the
@@ -34,11 +30,21 @@ module LightStep
     # (as Reference#CHILD_OF) of any newly-created Span at Tracer#start_active_span
     # or Tracer#start_span time.
     def active
-      @scopes.last
+      scopes.last
     end
 
     def deactivate
-      @scopes.pop
+      scopes.pop
+    end
+
+    private
+
+    def scopes
+      Thread.current[object_id.to_s] || []
+    end
+
+    def add_scope(scope)
+      Thread.current[object_id.to_s] = scopes + [scope]
     end
   end
 end

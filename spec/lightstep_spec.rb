@@ -577,6 +577,9 @@ describe LightStep do
     end
   end
 
+  # test that start_span properly gets the active scope's span and sets it as the parent of the new span
+  #
+
   describe '#start_active_span' do
     let(:tracer) { init_test_tracer }
 

@@ -44,7 +44,11 @@ module LightStep
     end
 
     def add_scope(scope)
-      Thread.current[object_id.to_s] = scopes + [scope]
+      if Thread.current[object_id.to_s].nil?
+        Thread.current[object_id.to_s] = [scope]
+      else
+        Thread.current[object_id.to_s] << scope
+      end
     end
   end
 end

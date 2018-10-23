@@ -27,5 +27,5 @@ publish: build test benchmark bump-version
 # LightStep-specific: rebuilds the LightStep protobuf files.
 proto:
 	protoc --proto_path "$(PWD)/../googleapis:$(PWD)/../lightstep-tracer-common/" \
-		--ruby_out="$(PWD)/lib/lightstep" \
-		collector.proto
+		--ruby_out="$(PWD)/lib/lightstep/proto" \
+		collector.proto google/api/annotations.proto google/api/http.proto

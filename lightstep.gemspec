@@ -18,6 +18,8 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'concurrent-ruby', '~> 1.0'
   spec.add_dependency 'opentracing', '~> 0.3'
+  spec.add_dependency 'google-protobuf', '~> 3.0.0.alpha.2.0'
+  spec.add_dependency 'google-api-client', '~> 0.24.3'
   spec.add_development_dependency 'rake', '~> 11.3'
   spec.add_development_dependency 'rack', '~> 2.0'
   spec.add_development_dependency 'rspec', '~> 3.0'

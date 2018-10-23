@@ -1,11 +1,11 @@
 PATH
   remote: .
   specs:
-    lightstep (0.12.0)
+    lightstep (0.13.0)
       concurrent-ruby (~> 1.0)
       google-api-client (~> 0.24.3)
       google-protobuf (~> 3.0.0.alpha.2.0)
-      opentracing (~> 0.3)
+      opentracing (~> 0.4.1)
 
 GEM
   remote: https://rubygems.org/
@@ -94,4 +94,4 @@ DEPENDENCIES
   timecop (~> 0.8.0)
 
 BUNDLED WITH
-   1.16.4
+   1.16.6

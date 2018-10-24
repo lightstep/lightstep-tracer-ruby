@@ -111,11 +111,22 @@ describe LightStep do
     span.finish
   end
 
-  it 'should allow tag-setting of bool and number at start_span time' do
+  it 'should coerce all tag values into strings' do
+    class SampleClass
+    end
     tracer = init_test_tracer
-    span = tracer.start_span('my_span', tags: {'number_key' => 1, 'bool_key' => true})
-    expect(span.tags['number_key']).to eq('1')
-    expect(span.tags['bool_key']).to eq('true')
+    span = tracer.start_span('my_span', tags: {
+        'number_key' => 1,
+        'bool_key' => true,
+        'float_key' => 2.19,
+        'array_key' => [1,2,3],
+        'float_with_underscore_key' => 1_234_567,
+        'hash_key' => {'1' => 2},
+        'object_key' => SampleClass .new }
+    )
+    span.tags.each do |_, v|
+      expect(v.is_a?(String))
+    end
     span.finish
   end
 

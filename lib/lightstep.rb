@@ -45,3 +45,5 @@ end
 
 require 'lightstep/tracer'
 require 'lightstep/global_tracer'
+require 'lightstep/scope'
+require 'lightstep/scope_manager'

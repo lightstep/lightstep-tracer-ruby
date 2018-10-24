@@ -42,7 +42,7 @@ module LightStep
     )
 
       @tags = Concurrent::Hash.new
-      @tags.update(tags.each do |tag| tag.map do |k, v| { k => v.to_s } end end) unless tags.nil?
+      @tags.update(tags.each do |k, v| tags[k] = v.to_s end) unless tags.nil?
       @log_records = Concurrent::Array.new
       @dropped_logs = Concurrent::AtomicFixnum.new
       @max_log_records = max_log_records

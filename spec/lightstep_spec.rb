@@ -105,7 +105,7 @@ describe LightStep do
   it 'should allow tag-setting at start_span time' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span', tags: {'start_key' => 'start_val'})
-    span.set_tag('during_key', 'during_val')√
+    span.set_tag('during_key', 'during_val')
     expect(span.tags['start_key']).to eq('start_val')
     expect(span.tags['during_key']).to eq('during_val')
     span.finish

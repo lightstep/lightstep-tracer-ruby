@@ -112,8 +112,7 @@ describe LightStep do
   end
 
   it 'should coerce all tag values into strings' do
-    class SampleClass
-    end
+    class SampleClass ; end
     tracer = init_test_tracer
     span = tracer.start_span('my_span', tags: {
         'number_key' => 1,
@@ -122,7 +121,7 @@ describe LightStep do
         'array_key' => [1,2,3],
         'float_with_underscore_key' => 1_234_567,
         'hash_key' => {'1' => 2},
-        'object_key' => SampleClass .new }
+        'object_key' => SampleClass.new }
     )
     span.tags.each do |_, v|
       expect(v.is_a?(String))

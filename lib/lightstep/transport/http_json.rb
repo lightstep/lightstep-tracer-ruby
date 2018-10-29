@@ -1,5 +1,6 @@
 require 'net/http'
 require 'lightstep/transport/base'
+require 'lightstep/auth'
 
 module LightStep
   module Transport
@@ -60,7 +61,7 @@ module LightStep
 
         raise Tracer::ConfigurationError, 'access_token must be a string' unless access_token.is_a?(String)
         raise Tracer::ConfigurationError, 'access_token cannot be blank'  if access_token.empty?
-        @access_token = access_token
+        @auth = Auth.new(access_token)
         @logger = logger || LightStep.logger
       end
 
@@ -86,7 +87,7 @@ module LightStep
       #
       def build_request(report)
         req = Net::HTTP::Post.new(REPORTS_API_ENDPOINT)
-        req[HEADER_ACCESS_TOKEN] = @access_token
+        req[HEADER_ACCESS_TOKEN] = @auth.access_token
         req['Content-Type'] = 'application/json'
         req['Connection'] = 'keep-alive'
         req.body = report.to_json

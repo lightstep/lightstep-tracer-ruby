@@ -1,4 +1,5 @@
 require 'lightstep/version'
+require 'lightstep/report_request'
 
 module LightStep
   # Reporter builds up reports of spans and flushes them to a transport
@@ -62,18 +63,7 @@ module LightStep
         0
       end
 
-      report_request = {
-        runtime: @runtime,
-        oldest_micros: @report_start_time,
-        youngest_micros: now,
-        span_records: span_records,
-        internal_metrics: {
-          counts: [{
-            name: 'spans.dropped',
-            int64_value: dropped_spans
-          }]
-        }
-      }
+      report_request = ReportRequest.new(@runtime, @report_start_time, now, span_records, dropped_spans)
 
       @report_start_time = now
 

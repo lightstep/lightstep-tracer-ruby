@@ -28,4 +28,4 @@ publish: build test benchmark bump-version
 proto:
 	protoc --proto_path "$(PWD)/../googleapis:$(PWD)/../lightstep-tracer-common/" \
 		--ruby_out="$(PWD)/lib/lightstep/proto" \
-		collector.proto google/api/annotations.proto google/api/http.proto
+		collector.proto

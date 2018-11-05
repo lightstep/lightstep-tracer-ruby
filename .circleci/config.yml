@@ -1,0 +1,31 @@
+version: 2
+
+jobs:
+  test:
+    docker:
+      - image: circleci/ruby:2
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gem-cache-v2-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-v2-{{ .Branch }}-
+            - gem-cache-v2-
+      - run:
+          name: "set up environment"
+          command: |
+            echo 'export BUNDLE_PATH="$HOME/project/.bundler_cache"' >> $BASH_ENV
+            source $BASH_ENV
+      - run: bundle
+      - save_cache:
+          paths:
+            - ~/project/.bundler_cache
+          key: gem-cache-v2-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+      - run: make test
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
+

@@ -6,7 +6,7 @@ describe LightStep do
   end
 
   def init_callback_tracer(callback)
-    tracer = LightStep::Tracer.new(
+    LightStep::Tracer.new(
       component_name: 'lightstep/ruby/spec',
       transport: LightStep::Transport::Callback.new(callback: callback)
     )
@@ -28,8 +28,8 @@ describe LightStep do
     tracer = init_test_tracer
     parent_span = tracer.start_span('parent_span')
     parent_span.set_baggage(test: 'value')
-    child_span = tracer.start_span('child_span', child_of: parent_span.span_context)
-    expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
+    child_span = tracer.start_span('child_span', child_of: parent_span.context)
+    expect(child_span.context.baggage).to eq(parent_span.context.baggage)
   end
 
   it 'should inherit baggage from parent spans' do
@@ -96,7 +96,7 @@ describe LightStep do
   it 'should not allow SpanContext modification' do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
-    context = span.span_context
+    context = span.context
     expect{context.baggage['foo'] = 'bar'}.to raise_error(RuntimeError)
     expect{context.id.slice!(0,1)}.to raise_error(RuntimeError)
     expect{context.trace_id.slice!(0,1)}.to raise_error(RuntimeError)
@@ -108,6 +108,24 @@ describe LightStep do
     span.set_tag('during_key', 'during_val')
     expect(span.tags['start_key']).to eq('start_val')
     expect(span.tags['during_key']).to eq('during_val')
+    span.finish
+  end
+
+  it 'should coerce all tag values into strings' do
+    class SampleClass ; end
+    tracer = init_test_tracer
+    span = tracer.start_span('my_span', tags: {
+        'number_key' => 1,
+        'bool_key' => true,
+        'float_key' => 2.19,
+        'array_key' => [1,2,3],
+        'float_with_underscore_key' => 1_234_567,
+        'hash_key' => {'1' => 2},
+        'object_key' => SampleClass.new }
+    )
+    span.tags.each do |_, v|
+      expect(v.is_a?(String))
+    end
     span.finish
   end
 
@@ -140,7 +158,7 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
 
-    expect(span.span_context.id).to be_an_instance_of String
+    expect(span.context.id).to be_an_instance_of String
     span.finish
   end
 
@@ -181,21 +199,21 @@ describe LightStep do
     parent1 = tracer.start_span('parent1')
     parent2 = tracer.start_span('parent2')
 
-    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1.span_context) }
-    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2.span_context) }
+    children1 = (1..4).to_a.map { tracer.start_span('child', child_of: parent1.context) }
+    children2 = (1..4).to_a.map { tracer.start_span('child', child_of: parent2.context) }
 
     children1.each do |child|
-      expect(child.span_context.trace_id).to be_an_instance_of String
-      expect(child.span_context.trace_id).to eq(parent1.span_context.trace_id)
-      expect(child.span_context.trace_id).not_to eq(parent2.span_context.trace_id)
-      expect(child.tags[:parent_span_guid]).to eq(parent1.span_context.id)
+      expect(child.context.trace_id).to be_an_instance_of String
+      expect(child.context.trace_id).to eq(parent1.context.trace_id)
+      expect(child.context.trace_id).not_to eq(parent2.context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent1.context.id)
     end
 
     children2.each do |child|
-      expect(child.span_context.trace_id).to be_an_instance_of String
-      expect(child.span_context.trace_id).to eq(parent2.span_context.trace_id)
-      expect(child.span_context.trace_id).not_to eq(parent1.span_context.trace_id)
-      expect(child.tags[:parent_span_guid]).to eq(parent2.span_context.id)
+      expect(child.context.trace_id).to be_an_instance_of String
+      expect(child.context.trace_id).to eq(parent2.context.trace_id)
+      expect(child.context.trace_id).not_to eq(parent1.context.trace_id)
+      expect(child.tags[:parent_span_guid]).to eq(parent2.context.id)
     end
 
     children1.each(&:finish)
@@ -205,7 +223,7 @@ describe LightStep do
 
     (children1.concat children2).each do |child|
       thrift_data = child.to_h
-      expect(thrift_data[:trace_guid]).to eq(child.span_context.trace_id)
+      expect(thrift_data[:trace_guid]).to eq(child.context.trace_id)
     end
   end
 
@@ -215,7 +233,7 @@ describe LightStep do
     file = File.open('./lib/lightstep.rb', 'r')
     data = [
       nil,
-      TRUE, FALSE,
+      true, false,
       0, -1, 1,
       0.0, -1.0, 1.0,
       '', 'a', 'a longer string',
@@ -255,10 +273,10 @@ describe LightStep do
   it 'should handle nested spans' do
     tracer = init_test_tracer
     s0 = tracer.start_span('s0')
-    s1 = tracer.start_span('s1', child_of: s0.span_context)
-    s2 = tracer.start_span('s2', child_of: s1.span_context)
-    s3 = tracer.start_span('s3', child_of: s2.span_context)
-    s4 = tracer.start_span('s4', child_of: s3.span_context)
+    s1 = tracer.start_span('s1', child_of: s0.context)
+    s2 = tracer.start_span('s2', child_of: s1.context)
+    s3 = tracer.start_span('s3', child_of: s2.context)
+    s4 = tracer.start_span('s4', child_of: s3.context)
     s4.finish
     s3.finish
     s2.finish
@@ -344,15 +362,16 @@ describe LightStep do
     span1.set_baggage_item('umbrella', 'golf')
 
     carrier = {}
-    tracer.inject(span1.span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_TEXT_MAP, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
     span_ctx = tracer.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
-    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
-    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
+    expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
     expect(span_ctx.baggage['umbrella']).to eq('golf')
 
@@ -368,9 +387,10 @@ describe LightStep do
     span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
 
     carrier = {}
-    tracer.inject(span1.span_context, OpenTracing::FORMAT_RACK, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.span_context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.span_context.id)
+
+    tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
     expect(carrier['ot-baggage-unsafeheader']).to be_nil
@@ -383,8 +403,8 @@ describe LightStep do
     end
 
     span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
-    expect(span_ctx.trace_id).to eq(span1.span_context.trace_id)
-    expect(span_ctx.id).to eq(span1.span_context.id)
+    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
+    expect(span_ctx.id).to eq(span1.context.id)
     expect(span_ctx.baggage['footwear']).to eq('cleats')
     expect(span_ctx.baggage['umbrella']).to eq('golf')
     expect(span_ctx.baggage['unsafe!@#$%$^&header']).to be_nil
@@ -555,5 +575,136 @@ describe LightStep do
     records = result[:span_records]
     expect(records[0][:span_name]).to eq("5")
     expect(records[1][:span_name]).to eq("[:foo]")
+  end
+
+  describe '#scope_manager' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should return a scope manager' do
+      expect(tracer.scope_manager).to be_an_instance_of(LightStep::ScopeManager)
+    end
+
+    context 'when the scope manager exists' do
+      before(:each) do
+        @manager = tracer.scope_manager
+      end
+
+      it 'should return the same scope manager' do
+        expect(tracer.scope_manager).to eq(@manager)
+      end
+    end
+  end
+
+  describe '#start_span' do
+    let(:tracer) { init_test_tracer }
+
+    context 'when there is an active scope' do
+      before(:each) do
+        @scope = tracer.start_active_span('some-operation')
+        @parent_span = @scope.span
+      end
+
+      it 'should create a child_of reference to the active scope' do
+        span = tracer.start_span('child-operation')
+        expect(span.tags[:parent_span_guid]).to eq(@parent_span.context.id)
+      end
+
+      context 'when ignore_active_scope is true' do
+        it 'should not create a child_of reference to the active scope' do
+          span = tracer.start_span('child-operation', ignore_active_scope: true)
+          expect(span.tags[:parent_span_guid]).not_to eq(@parent_span.context.id)
+        end
+      end
+    end
+  end
+
+  describe '#start_active_span' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should set the active scope' do
+      span = tracer.start_active_span('some-operation')
+
+      actual = tracer.scope_manager.active
+      expect(actual).to be_an_instance_of(LightStep::Scope)
+      expect(actual.span.to_h[:span_name]).to eq('some-operation')
+    end
+
+    it 'should yield the active scope when given a block' do
+      tracer.start_active_span('some-operation') do |scope|
+        expect(scope).to be_an_instance_of(LightStep::Scope)
+
+        expected_scope = tracer.scope_manager.active
+        expect(scope).to eq(expected_scope)
+        expect(scope.span.to_h[:span_name]).to eq('some-operation')
+      end
+    end
+
+    context 'when a block is given' do
+      before(:each) do
+        tracer.start_active_span('some-operation') do |scope|
+          @scope = scope
+          expect(@scope.span.end_micros).to be_nil
+        end
+      end
+
+      it 'should finish the span' do
+        expect(@scope.span.end_micros).not_to be_nil
+      end
+
+    end
+
+    context 'when finish_on_close is false and a block is given' do
+      before(:each) do
+        tracer.start_active_span('some-operation', finish_on_close: false) do |scope|
+          @scope = scope
+          expect(@scope.span.end_micros).to be_nil
+        end
+      end
+
+      it 'should not finish the span after the block finishes yielding' do
+        expect(@scope.span.end_micros).to be_nil
+      end
+    end
+
+    context 'when there is an active scope' do
+      let!(:parent_span) { tracer.start_active_span('some-operation').span }
+      let(:scope) { tracer.start_active_span('child-operation') }
+
+      it 'should create a child_of reference to the active scope' do
+        expect(scope.span.tags[:parent_span_guid]).to eq(parent_span.context.id)
+      end
+
+      context 'when ignore_active_scope is true' do
+        let(:scope) { tracer.start_active_span('child-operation', ignore_active_scope: true) }
+
+        it 'should not create a child_of reference to the active scope', focus: true do
+          expect(scope.span.tags[:parent_span_guid]).not_to eq(parent_span.context.id)
+        end
+      end
+    end
+
+    xit 'should create a span with the given operation_name'
+    xit 'should create a span with the given child_of'
+    xit 'should create a span with the given references'
+    xit 'should create a span with the given start_time'
+    xit 'should create a span with the given tags'
+  end
+
+  describe '#active_span' do
+    let(:tracer) { init_test_tracer }
+
+    it 'should return nil' do
+      expect(tracer.active_span).to be_nil
+    end
+
+    context 'when there is an active scope' do
+      before(:each) do
+        scope = tracer.start_active_span('some-operation')
+      end
+
+      it 'should return the active span' do
+        expect(tracer.active_span.to_h[:span_name]).to eq('some-operation')
+      end
+    end
   end
 end

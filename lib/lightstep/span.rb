@@ -11,7 +11,10 @@ module LightStep
 
     # Internal use only
     # @private
-    attr_reader :start_micros, :end_micros, :tags, :operation_name, :span_context
+    attr_reader :start_micros, :end_micros, :tags, :operation_name, :context
+
+    # To keep backwards compatibility
+    alias_method :span_context, :context
 
     # Creates a new {Span}
     #
@@ -37,8 +40,9 @@ module LightStep
       tags: nil,
       max_log_records:
     )
+
       @tags = Concurrent::Hash.new
-      @tags.update(tags) unless tags.nil?
+      @tags.update(tags.each { |k, v| tags[k] = v.to_s }) unless tags.nil?
       @log_records = Concurrent::Array.new
       @dropped_logs = Concurrent::AtomicFixnum.new
       @max_log_records = max_log_records
@@ -49,14 +53,14 @@ module LightStep
 
       ref = child_of ? child_of : references
       ref = ref[0] if (Array === ref)
-      ref = ref.span_context if (Span === ref)
+      ref = ref.context if (Span === ref)
 
       if SpanContext === ref
-        @span_context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id)
+        @context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id)
         set_baggage(ref.baggage)
         set_tag(:parent_span_guid, ref.id)
       else
-        @span_context = SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid)
+        @context = SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid)
       end
     end
 
@@ -76,10 +80,10 @@ module LightStep
     # @param key [String] the key of the baggage item
     # @param value [String] the value of the baggage item
     def set_baggage_item(key, value)
-      @span_context = SpanContext.new(
-        id: span_context.id,
-        trace_id: span_context.trace_id,
-        baggage: span_context.baggage.merge({key => value})
+      @context = SpanContext.new(
+        id: context.id,
+        trace_id: context.trace_id,
+        baggage: context.baggage.merge({key => value})
       )
       self
     end
@@ -87,9 +91,9 @@ module LightStep
     # Set all baggage at once. This will reset the baggage to the given param.
     # @param baggage [Hash] new baggage for the span
     def set_baggage(baggage = {})
-      @span_context = SpanContext.new(
-        id: span_context.id,
-        trace_id: span_context.trace_id,
+      @context = SpanContext.new(
+        id: context.id,
+        trace_id: context.trace_id,
         baggage: baggage
       )
     end
@@ -98,7 +102,7 @@ module LightStep
     # @param key [String] the key of the baggage item
     # @return Value of the baggage item
     def get_baggage_item(key)
-      span_context.baggage[key]
+      context.baggage[key]
     end
 
     # Add a log entry to this span
@@ -140,8 +144,8 @@ module LightStep
     def to_h
       {
         runtime_guid: tracer.guid,
-        span_guid: span_context.id,
-        trace_guid: span_context.trace_id,
+        span_guid: context.id,
+        trace_guid: context.trace_id,
         span_name: operation_name,
         attributes: tags.map {|key, value|
           {Key: key.to_s, Value: value}

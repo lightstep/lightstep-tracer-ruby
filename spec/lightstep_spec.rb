@@ -90,6 +90,7 @@ describe LightStep do
     span.set_tag('array', [:hello])
     span.set_baggage_item('baggage_key', 'baggage_item')
     span.log(event: 'event_name', key: 'value')
+    span.log_kv(a: 1, b: 'c')
     span.finish
   end
 
@@ -149,7 +150,7 @@ describe LightStep do
     tracer = init_test_tracer
     span = tracer.start_span('my_span')
     10_000.times do
-      span.log event: 'test log'
+      span.log_kv key: 'value'
     end
     span.finish
   end
@@ -252,7 +253,7 @@ describe LightStep do
       nil::NilClass
     ]
     data.each do |value|
-      span.log event: 'test', value: value
+      span.log_kv key: 'value'
     end
     span.finish
     file.close
@@ -266,7 +267,7 @@ describe LightStep do
 
     tracer = init_test_tracer
     span = tracer.start_span('test_span')
-    span.log event: 'circular_ref', a: a
+    span.log_kv a: a
     span.finish
   end
 
@@ -289,7 +290,7 @@ describe LightStep do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })
     s0 = tracer.start_span('s0')
-    s0.log(event: 'test_event')
+    s0.log_kv(a: 'bc')
     s0.finish
     tracer.flush
 
@@ -305,6 +306,37 @@ describe LightStep do
     expect(runtime_attrs).to include('lightstep.tracer_platform_version')
   end
 
+  it 'should report that Span#log is deprecated' do
+    tracer = init_test_tracer
+    span = tracer.start_span('span')
+    expect { span.log(event: 'event') }.to output(
+      "Span#log is deprecated. Please use Span#log_kv instead.\n"
+    ).to_stderr
+  end
+
+  it 'should delegate Span#log' do
+    result = nil
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
+    )
+
+    reported_fields = proc do |fields|
+      span = tracer.start_span('span')
+      span.log(event: 'test-event', key: 'value')
+      span.finish
+      tracer.flush
+
+      expect(result[:span_records].length).to eq(1)
+      expect(result[:span_records][0][:log_records].length).to eq(1)
+
+      result[:span_records][0][:log_records][0][:fields]
+    end
+
+    expect(reported_fields[:event]).to include({ Key: 'event', Value: 'test-event' })
+    expect(reported_fields[:key]).to include({ Key: 'key', Value: 'value' })
+  end
+
   it 'should report payloads correctly' do
     # "Report" to an object so we can examine the result
     result = nil
@@ -315,7 +347,7 @@ describe LightStep do
 
     reported_fields = proc do |fields|
       s0 = tracer.start_span('s0')
-      s0.log(**fields)
+      s0.log_kv(**fields)
       s0.finish
       tracer.flush
       JSON.generate(result[:span_records][0][:log_records][0][:fields])
@@ -345,7 +377,7 @@ describe LightStep do
       }
     )
     s0 = tracer.start_span('s0')
-    s0.log(event: 'test_event')
+    s0.log_kv
     s0.finish
     tracer.flush
 
@@ -434,7 +466,7 @@ describe LightStep do
         child = tracer.start_span("child_span_#{i}")
         10.times do |j|
           sleep 0.01
-          child.log(j: j)
+          child.log_kv(j: j)
         end
         child.finish
       end
@@ -461,7 +493,7 @@ describe LightStep do
             child = tracer.start_span("child_span_#{i}")
             for j in 1..10
               sleep 0.01
-              child.log(j: j)
+              child.log_kv(j: j)
             end
             child.finish
           end
@@ -529,7 +561,7 @@ describe LightStep do
         span = tracer.start_span("span_#{i}")
         (1..10).map do |j|
           Thread.new do
-            span.log(j: j)
+            span.log_kv(j: j)
           end
         end.map(&:join)
         span.finish

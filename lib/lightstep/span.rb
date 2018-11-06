@@ -105,22 +105,32 @@ module LightStep
       context.baggage[key]
     end
 
+    # @deprecated Use {#log_kv} instead.
     # Add a log entry to this span
     # @param event [String] event name for the log
     # @param timestamp [Time] time of the log
     # @param fields [Hash] Additional information to log
     def log(event: nil, timestamp: Time.now, **fields)
+      warn 'Span#log is deprecated. Please use Span#log_kv instead.'
       return unless tracer.enabled?
 
       fields = {} if fields.nil?
       unless event.nil?
 	fields[:event] = event.to_s
       end
+
+      log_kv(timestamp: timestamp, **fields)
+    end
+
+    def log_kv(timestamp: Time.now, **fields)
+      return unless tracer.enabled?
+
+      fields = {} if fields.nil?
       record = {
         timestamp_micros: LightStep.micros(timestamp),
-        fields: fields.to_a.map {|key, value|
-          {Key: key.to_s, Value: value.to_s}
-        },
+        fields: fields.to_a.map do |key, value|
+          { Key: key.to_s, Value: value.to_s }
+        end
       }
 
       log_records.push(record)

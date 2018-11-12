@@ -6,7 +6,7 @@ require 'lightstep'
 
 LightStep.configure(
   component_name: 'lightstep/ruby/examples/fork_children',
-  access_token: '61c90a839a46c996e79c56afa1f116b8'
+  access_token: '{your_access_token}'
 )
 
 puts 'Starting...'

@@ -5,7 +5,7 @@ require 'opentracing'
 require 'rack'
 require 'rack/server'
 
-$token = '61c90a839a46c996e79c56afa1f116b8'
+$token = '{your_access_token}'
 $request_id = 'abc123'
 
 class Router

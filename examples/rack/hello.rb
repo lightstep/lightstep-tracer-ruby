@@ -6,7 +6,7 @@ require 'rack'
 require 'lightstep/transport/http_proto'
 require 'rack/server'
 
-access_token = '5a5f4582709f11f715894c8dfc55a792'
+access_token = '{your_access_token}'
 
 LightStep.configure(
   component_name: 'lightstep/ruby/examples/helloWorld',

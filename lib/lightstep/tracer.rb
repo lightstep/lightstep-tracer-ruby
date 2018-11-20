@@ -1,4 +1,5 @@
 require 'json'
+require 'base64'
 require 'concurrent'
 
 require 'opentracing'
@@ -266,6 +267,9 @@ module LightStep
     TRACE_PARENT_VERSION = 0
     TRACE_PARENT_REGEX = /\h{2}-(\h{32})-(\h{16})-\h{2}/
 
+    TRACE_STATE = 'tracestate'.freeze
+    TRACE_STATE_VENDOR = 'lightstep'.freeze
+
     def inject_to_text_map(span_context, carrier)
       carrier[CARRIER_SPAN_ID] = span_context.id
       carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
@@ -303,6 +307,27 @@ module LightStep
         baggage
       end
 
+      vendor_states = (carrier[TRACE_STATE] || '').split(',')
+      vendor_states.each do |state|
+        vendor, value = state.match(/^(.*)=(.*)$/).captures
+
+        if vendor == TRACE_STATE_VENDOR
+          decoded_baggage = ''
+          begin
+            decoded_baggage = Base64.urlsafe_decode64(value || '')
+          rescue ArgumentError
+            next
+          end
+
+          decoded_baggage.split(',').each do |item|
+            key, value = item.match(/^(.*)=(.*)$/).captures
+            if !key.nil? && !key.empty?
+              baggage[key] = value
+            end
+          end
+        end
+      end
+
       SpanContext.new(
         id: id,
         trace_id: trace_id,
@@ -320,21 +345,30 @@ module LightStep
         span_id: span_context.id.rjust(16, '0')
       })
 
-      span_context.baggage.each do |key, value|
+      baggage_strings = []
+      span_context.baggage.sort.each do |key, value|
+        if !key.include?('=') && !value.include?('=')
+          baggage_strings << "#{key}=#{value}"
+        end
+
         if key =~ /[^A-Za-z0-9\-_]/
           # TODO: log the error internally
           next
         end
+
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
+
+      baggage_string = Base64.urlsafe_encode64(baggage_strings.join(','), padding: false)
+      carrier[TRACE_STATE] = "#{TRACE_STATE_VENDOR}=#{baggage_string}"
     end
 
     def extract_from_rack(env)
       extract_from_text_map(env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').tr('_', '-').downcase
+        header = raw_header.to_s.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
-        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX) || header == TRACE_PARENT
+        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX) || header == TRACE_PARENT || header == TRACE_STATE
         memo
       })
     end

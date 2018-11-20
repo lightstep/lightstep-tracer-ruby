@@ -410,51 +410,86 @@ describe LightStep do
     span1.finish
   end
 
-  it 'should handle inject/extract for http requests and rack' do
-    tracer = init_test_tracer
-    span1 = tracer.start_span('test_span')
-    span1.set_baggage_item('footwear', 'cleats')
-    span1.set_baggage_item('umbrella', 'golf')
-    span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
-    span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
+  describe '#inject' do
+    let(:tracer) { init_test_tracer }
 
-    carrier = {}
+    context 'http requests and rack' do
+      it 'should inject the trace ID, span ID, and baggage into the carrier' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('footwear', 'cleats')
+        span1.set_baggage_item('umbrella', 'golf')
 
-    tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
-    expect(carrier['ot-baggage-footwear']).to eq('cleats')
-    expect(carrier['ot-baggage-umbrella']).to eq('golf')
-    expect(carrier['ot-baggage-unsafeheader']).to be_nil
-    expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
+        carrier = {}
 
-    carrier = carrier.reduce({}) do |memo, tuple|
-      key, value = tuple
-      memo["HTTP_#{key.gsub("-", "_").upcase}"] = value
-      memo
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-tracer-traceid']).not_to be_empty
+        expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+        expect(carrier['ot-tracer-spanid']).not_to be_empty
+        expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
+        expect(carrier['ot-baggage-footwear']).to eq('cleats')
+        expect(carrier['ot-baggage-umbrella']).to eq('golf')
+      end
+
+      it 'should encode case sensitivity and underscores' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
+
+        carrier = {}
+
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
+      end
+
+      it 'should not encode unsafe keys' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
+
+        carrier = {}
+
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-baggage-unsafeheader']).to be_nil
+        expect(carrier['ot-baggage-unsafe!@#$%$^&header']).to be_nil
+      end
     end
+  end
 
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
-    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
-    expect(span_ctx.id).to eq(span1.context.id)
-    expect(span_ctx.baggage['footwear']).to eq('cleats')
-    expect(span_ctx.baggage['umbrella']).to eq('golf')
-    expect(span_ctx.baggage['unsafe!@#$%$^&header']).to be_nil
-    expect(span_ctx.baggage['unsafeheader']).to be_nil
-    expect(span_ctx.baggage['case-sensitivity-underscores']).to eq('value')
+  describe '#extract' do
+    let(:tracer) { init_test_tracer }
 
-    # We need both a TRACEID and SPANID.
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span_ctx).to be_nil
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
-    expect(span_ctx).to be_nil
+    context 'http requests and rack' do
+      it 'should extract the trace ID, span ID, and baggage from the carrier' do
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+          'HTTP_OT_TRACER_SPANID' => '123',
+          'HTTP_OT_BAGGAGE_FOOTWEAR' => 'cleats',
+          'HTTP_OT_BAGGAGE_UMBRELLA' => 'golf',
+        }
 
-    # We need both a TRACEID and SPANID; this has both so it should work.
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
-    expect(span_ctx.id).to eq('abc123')
-    expect(span_ctx.trace_id).to eq('bcd234')
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx.trace_id).to eq('abc')
+        expect(span_ctx.id).to eq('123')
+        expect(span_ctx.baggage['footwear']).to eq('cleats')
+        expect(span_ctx.baggage['umbrella']).to eq('golf')
+      end
 
-    span1.finish
+      it 'should require a trace ID and span ID' do
+        carrier = {}
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'HTTP_OT_TRACER_SPANID' => 'abc',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+      end
+    end
   end
 
   it 'should handle concurrent spans' do

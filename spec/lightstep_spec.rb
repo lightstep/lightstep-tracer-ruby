@@ -12,6 +12,9 @@ describe LightStep do
     )
   end
 
+  # Example from https://w3c.github.io/trace-context/#relationship-between-the-headers
+  let(:valid_traceparent) { '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01' }
+
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
     expect(tracer).to be_an_instance_of LightStep::Tracer
@@ -387,6 +390,27 @@ describe LightStep do
     expect(result[:runtime][:attrs]).to include({Key: "user-provided-array", Value: "[]"})
   end
 
+  it 'should truncate IDs to 16 bytes in reports' do
+    result = nil
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
+    )
+
+    extra_trace_id = (0..15).map { 'x' }.join
+    expected_trace_id = (0..15).map { 'a' }.join
+    trace_id = "#{extra_trace_id}#{expected_trace_id}"
+
+    parent_ctx = LightStep::SpanContext.new(trace_id: trace_id, id: 'test')
+
+    span = tracer.start_span('span', child_of: parent_ctx)
+    span.finish
+    tracer.flush
+
+    expect(result[:span_records].length).to eq(1)
+    expect(result[:span_records][0][:trace_guid]).to eq expected_trace_id
+  end
+
   it 'should handle inject/join for text carriers' do
     tracer = init_test_tracer
     span1 = tracer.start_span('test_span')
@@ -428,6 +452,9 @@ describe LightStep do
         expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
         expect(carrier['ot-baggage-footwear']).to eq('cleats')
         expect(carrier['ot-baggage-umbrella']).to eq('golf')
+
+        expected_traceparent = "00-#{span1.context.trace_id.rjust(32, '0')}-#{span1.context.id.rjust(16, '0')}-01"
+        expect(carrier['traceparent']).to eq(expected_traceparent)
       end
 
       it 'should encode case sensitivity and underscores' do
@@ -472,7 +499,26 @@ describe LightStep do
         expect(span_ctx.baggage['umbrella']).to eq('golf')
       end
 
-      it 'should require a trace ID and span ID' do
+      it 'should not need both the tracer and W3C headers together' do
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+          'HTTP_OT_TRACER_SPANID' => '123',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).not_to be_nil
+        expect(span_ctx.trace_id).to eq('abc')
+        expect(span_ctx.id).to eq('123')
+
+        carrier = {
+          'TRACEPARENT' => valid_traceparent,
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).not_to be_nil
+        expect(span_ctx.trace_id).to eq('0af7651916cd43dd8448eb211c80319c')
+        expect(span_ctx.id).to eq('b7ad6b7169203331')
+      end
+
+      it 'should require a trace ID and span ID, or a valid traceparent' do
         carrier = {}
         span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
         expect(span_ctx).to be_nil
@@ -485,6 +531,12 @@ describe LightStep do
 
         carrier = {
           'HTTP_OT_TRACER_SPANID' => 'abc',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'TRACEPARENT' => 'invalid',
         }
         span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
         expect(span_ctx).to be_nil

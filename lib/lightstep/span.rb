@@ -155,7 +155,7 @@ module LightStep
       {
         runtime_guid: tracer.guid,
         span_guid: context.id,
-        trace_guid: context.trace_id,
+        trace_guid: context.trace_id[-16..-1] || context.trace_id, # Hack to ensure the reported ID is <= 16 bytes
         span_name: operation_name,
         attributes: tags.map {|key, value|
           {Key: key.to_s, Value: value}

@@ -262,6 +262,10 @@ module LightStep
     DEFAULT_MAX_SPAN_RECORDS = 1000
     MIN_MAX_SPAN_RECORDS = 1
 
+    TRACE_PARENT = 'traceparent'.freeze
+    TRACE_PARENT_VERSION = 0
+    TRACE_PARENT_REGEX = /\h{2}-(\h{32})-(\h{16})-\h{2}/
+
     def inject_to_text_map(span_context, carrier)
       carrier[CARRIER_SPAN_ID] = span_context.id
       carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
@@ -273,9 +277,20 @@ module LightStep
     end
 
     def extract_from_text_map(carrier)
+      trace_id = carrier[CARRIER_TRACE_ID]
+      id = carrier[CARRIER_SPAN_ID]
+
+      if trace_id.nil? || trace_id.empty? || id.nil? || id.empty?
+        matches = TRACE_PARENT_REGEX.match(carrier[TRACE_PARENT])
+        unless matches.nil?
+          trace_id = matches[1]
+          id = matches[2]
+        end
+      end
+
       # If the carrier does not have both the span_id and trace_id key
       # skip the processing and just return a normal span
-      if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
+      if trace_id.nil? || trace_id.empty? || id.nil? || id.empty?
         return nil
       end
 
@@ -287,10 +302,11 @@ module LightStep
         end
         baggage
       end
+
       SpanContext.new(
-        id: carrier[CARRIER_SPAN_ID],
-        trace_id: carrier[CARRIER_TRACE_ID],
-        baggage: baggage,
+        id: id,
+        trace_id: trace_id,
+        baggage: baggage
       )
     end
 
@@ -298,6 +314,11 @@ module LightStep
       carrier[CARRIER_SPAN_ID] = span_context.id
       carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
       carrier[CARRIER_SAMPLED] = 'true'
+      carrier[TRACE_PARENT] = format('%<version>02x-%<trace_id>s-%<span_id>s-01', {
+        version: TRACE_PARENT_VERSION,
+        trace_id: span_context.trace_id.rjust(32, '0'),
+        span_id: span_context.id.rjust(16, '0')
+      })
 
       span_context.baggage.each do |key, value|
         if key =~ /[^A-Za-z0-9\-_]/
@@ -313,7 +334,7 @@ module LightStep
         raw_header, value = tuple
         header = raw_header.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
-        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
+        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX) || header == TRACE_PARENT
         memo
       })
     end

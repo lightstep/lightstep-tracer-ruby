@@ -311,7 +311,7 @@ module LightStep
     def extract_from_rack(env)
       extract_from_text_map(env.reduce({}){|memo, tuple|
         raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').tr('_', '-').downcase
+        header = raw_header.to_s.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
         memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
         memo

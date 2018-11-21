@@ -457,6 +457,33 @@ describe LightStep do
     span1.finish
   end
 
+  it 'should be able to extract from a carrier with string or symbol keys' do
+    trace_id = '123'
+    span_id = 'abc'
+
+    tracer = init_test_tracer
+
+    carrier_with_strings = {
+      'HTTP_OT_TRACER_TRACEID' => trace_id,
+      'HTTP_OT_TRACER_SPANID' => span_id,
+    }
+    string_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier_with_strings)
+
+    expect(string_ctx).not_to be_nil
+    expect(string_ctx.trace_id).to eq(trace_id)
+    expect(string_ctx.id).to eq(span_id)
+
+    carrier_with_symbols = {
+      HTTP_OT_TRACER_TRACEID: trace_id,
+      HTTP_OT_TRACER_SPANID: span_id,
+    }
+    symbol_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier_with_symbols)
+
+    expect(symbol_ctx).not_to be_nil
+    expect(symbol_ctx.trace_id).to eq(trace_id)
+    expect(symbol_ctx.id).to eq(span_id)
+  end
+
   it 'should handle concurrent spans' do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })

@@ -579,6 +579,62 @@ describe LightStep do
     end
   end
 
+  describe 'tracestate propagation' do
+    let (:tracer) { init_test_tracer }
+
+    it 'should propagate tracestate from other vendors' do
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => 'other=vendor,another=foobar'
+      }
+
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
+
+      new_carrier = {}
+      tracer.inject(span_ctx, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expect(new_carrier['tracestate']).to eq('lightstep=,other=vendor,another=foobar')
+    end
+
+    it 'should not double-propagate old LightStep tracestate' do
+      encoded_baggage = Base64.urlsafe_encode64('umbrella=golf', padding: false)
+
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => "other=vendor,lightstep=#{encoded_baggage},another=foobar"
+      }
+
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
+
+      span = tracer.start_span('test', child_of: span_ctx)
+      span.set_baggage_item('footwear', 'cleats')
+
+      new_carrier = {}
+      tracer.inject(span.context, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expected_baggage = Base64.urlsafe_encode64('footwear=cleats,umbrella=golf', padding: false)
+      expect(new_carrier['tracestate']).to eq("lightstep=#{expected_baggage},other=vendor,another=foobar")
+    end
+
+    it 'should truncate tracestate at 512 bytes' do
+      long_value = (0..1000).map { 'a' }.join
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => "other=vendor,long=#{long_value},another=foobar"
+      }
+
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
+
+      new_carrier = {}
+      tracer.inject(span_ctx, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expect(new_carrier['tracestate']).to eq('lightstep=,other=vendor')
+    end
+  end
+
   it 'should handle concurrent spans' do
     result = nil
     tracer = init_callback_tracer(proc { |obj|; result = obj; })

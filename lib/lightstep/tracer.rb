@@ -269,6 +269,7 @@ module LightStep
 
     TRACE_STATE = 'tracestate'.freeze
     TRACE_STATE_VENDOR = 'lightstep'.freeze
+    MAX_TRACE_STATE_SIZE = 512
 
     def inject_to_text_map(span_context, carrier)
       carrier[CARRIER_SPAN_ID] = span_context.id
@@ -307,31 +308,30 @@ module LightStep
         baggage
       end
 
-      vendor_states = (carrier[TRACE_STATE] || '').split(',')
-      vendor_states.each do |state|
-        vendor, value = state.match(/^(.*)=(.*)$/).captures
+      trace_state = (carrier[TRACE_STATE] || '').split(',')
+        .map { |item| item.match(/^(.*)=(.*)$/).captures }
+        .find_all { |vendor, state| !vendor.nil? && !vendor.empty? && !state.nil? }
+        .reduce([]) do |memo, (vendor, value)|
+          if vendor == TRACE_STATE_VENDOR
+            decode_tracestate_baggage(value).each do |b|
+              key, value = b.match(/^(.*)=(.*)$/).captures
 
-        if vendor == TRACE_STATE_VENDOR
-          decoded_baggage = ''
-          begin
-            decoded_baggage = Base64.urlsafe_decode64(value || '')
-          rescue ArgumentError
-            next
-          end
-
-          decoded_baggage.split(',').each do |item|
-            key, value = item.match(/^(.*)=(.*)$/).captures
-            if !key.nil? && !key.empty?
-              baggage[key] = value
+              unless key.nil? || key.empty?
+                baggage[key] = value
+              end
             end
+          else
+            memo << "#{vendor}=#{value}"
           end
+
+          memo
         end
-      end
 
       SpanContext.new(
         id: id,
         trace_id: trace_id,
-        baggage: baggage
+        baggage: baggage,
+        trace_state: trace_state
       )
     end
 
@@ -360,7 +360,17 @@ module LightStep
       end
 
       baggage_string = Base64.urlsafe_encode64(baggage_strings.join(','), padding: false)
-      carrier[TRACE_STATE] = "#{TRACE_STATE_VENDOR}=#{baggage_string}"
+      trace_state = "#{TRACE_STATE_VENDOR}=#{baggage_string}"
+
+      for item in span_context.trace_state
+        if trace_state.length + item.length + 1 > MAX_TRACE_STATE_SIZE
+          break
+        end
+
+        trace_state << ',' << item
+      end
+
+      carrier[TRACE_STATE] = trace_state
     end
 
     def extract_from_rack(env)
@@ -371,6 +381,16 @@ module LightStep
         memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX) || header == TRACE_PARENT || header == TRACE_STATE
         memo
       })
+    end
+
+    def decode_tracestate_baggage(value)
+      begin
+        decoded_baggage = Base64.urlsafe_decode64(value || '')
+      rescue ArgumentError
+        decoded_baggage = ''
+      end
+
+      decoded_baggage.split(',')
     end
   end
 end

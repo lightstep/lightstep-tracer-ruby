@@ -313,13 +313,7 @@ module LightStep
         .find_all { |vendor, state| !vendor.nil? && !vendor.empty? && !state.nil? }
         .reduce([]) do |memo, (vendor, value)|
           if vendor == TRACE_STATE_VENDOR
-            decode_tracestate_baggage(value).each do |b|
-              key, value = b.match(/^(.*)=(.*)$/).captures
-
-              unless key.nil? || key.empty?
-                baggage[key] = value
-              end
-            end
+            baggage = baggage.merge(decode_tracestate_baggage(value))
           else
             memo << "#{vendor}=#{value}"
           end
@@ -345,12 +339,7 @@ module LightStep
         span_id: span_context.id.rjust(16, '0')
       })
 
-      baggage_strings = []
       span_context.baggage.sort.each do |key, value|
-        if !key.include?('=') && !value.include?('=')
-          baggage_strings << "#{key}=#{value}"
-        end
-
         if key =~ /[^A-Za-z0-9\-_]/
           # TODO: log the error internally
           next
@@ -359,8 +348,13 @@ module LightStep
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
 
-      baggage_string = Base64.urlsafe_encode64(baggage_strings.join(','), padding: false)
-      trace_state = "#{TRACE_STATE_VENDOR}=#{baggage_string}"
+      encoded_baggage = ''
+
+      unless span_context.baggage.empty?
+        encoded_baggage = Base64.urlsafe_encode64(JSON.generate(span_context.baggage), padding: false)
+      end
+
+      trace_state = "#{TRACE_STATE_VENDOR}=#{encoded_baggage}"
 
       for item in span_context.trace_state
         if trace_state.length + item.length + 1 > MAX_TRACE_STATE_SIZE
@@ -387,10 +381,10 @@ module LightStep
       begin
         decoded_baggage = Base64.urlsafe_decode64(value || '')
       rescue ArgumentError
-        decoded_baggage = ''
+        decoded_baggage = nil
       end
 
-      decoded_baggage.split(',')
+      JSON.parse(decoded_baggage)
     end
   end
 end

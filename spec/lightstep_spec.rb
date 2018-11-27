@@ -457,7 +457,10 @@ describe LightStep do
         expected_traceparent = "00-#{span1.context.trace_id.rjust(32, '0')}-#{span1.context.id.rjust(16, '0')}-01"
         expect(carrier['traceparent']).to eq(expected_traceparent)
 
-        expected_baggage = Base64.urlsafe_encode64('footwear=cleats,umbrella=golf', padding: false)
+        expected_baggage = Base64.urlsafe_encode64(JSON.generate({
+          footwear: 'cleats',
+          umbrella: 'golf'
+        }), padding: false)
         expected_tracestate = "lightstep=#{expected_baggage}"
         expect(carrier['tracestate']).to eq(expected_tracestate)
       end
@@ -471,7 +474,7 @@ describe LightStep do
         tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
         expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
 
-        expected_baggage = Base64.urlsafe_encode64('CASE-Sensitivity_Underscores=value', padding: false)
+        expected_baggage = Base64.urlsafe_encode64('{"CASE-Sensitivity_Underscores":"value"}', padding: false)
         expected_tracestate = "lightstep=#{expected_baggage}"
         expect(carrier['tracestate']).to eq(expected_tracestate)
       end
@@ -486,7 +489,7 @@ describe LightStep do
         expect(carrier['ot-baggage-unsafeheader']).to be_nil
         expect(carrier['ot-baggage-unsafe!@#$%$^&header']).to be_nil
 
-        expected_baggage = Base64.urlsafe_encode64('unsafe!@#$%$^&header=value', padding: false)
+        expected_baggage = Base64.urlsafe_encode64('{"unsafe!@#$%$^&header":"value"}', padding: false)
         expected_tracestate = "lightstep=#{expected_baggage}"
         expect(carrier['tracestate']).to eq(expected_tracestate)
       end
@@ -522,7 +525,10 @@ describe LightStep do
       end
 
       it 'should extract baggage from tracestate' do
-        encoded_baggage = Base64.urlsafe_encode64('umbrella=golf,footwear=cleats', padding: false)
+        encoded_baggage = Base64.urlsafe_encode64(JSON.generate({
+          footwear: 'cleats',
+          umbrella: 'golf'
+        }), padding: false)
         carrier = {
           'HTTP_OT_TRACER_TRACEID' => 'abc',
           'HTTP_OT_TRACER_SPANID' => '123',
@@ -598,7 +604,7 @@ describe LightStep do
     end
 
     it 'should not double-propagate old LightStep tracestate' do
-      encoded_baggage = Base64.urlsafe_encode64('umbrella=golf', padding: false)
+      encoded_baggage = Base64.urlsafe_encode64('{"umbrella":"golf"}', padding: false)
 
       original_carrier = {
         'TRACEPARENT' => valid_traceparent,
@@ -614,7 +620,10 @@ describe LightStep do
       new_carrier = {}
       tracer.inject(span.context, OpenTracing::FORMAT_RACK, new_carrier)
 
-      expected_baggage = Base64.urlsafe_encode64('footwear=cleats,umbrella=golf', padding: false)
+      expected_baggage = Base64.urlsafe_encode64(JSON.generate({
+        umbrella: 'golf',
+        footwear: 'cleats'
+      }), padding: false)
       expect(new_carrier['tracestate']).to eq("lightstep=#{expected_baggage},other=vendor,another=foobar")
     end
 

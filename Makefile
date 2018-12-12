@@ -1,4 +1,4 @@
-.PHONY: build test benchmark publish
+.PHONY: build test benchmark publish conformance
 
 build:
 	gem build lightstep.gemspec
@@ -22,3 +22,8 @@ bump-version:
 
 publish: build test benchmark bump-version
 	gem push lightstep-`ruby scripts/version.rb`.gem
+
+export PATH := /workspace/gopath/bin:$(PATH)
+conformance:
+	bundle
+	runner ruby conformance_test/client.rb

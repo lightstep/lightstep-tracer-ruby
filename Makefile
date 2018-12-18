@@ -23,7 +23,5 @@ bump-version:
 publish: build test benchmark bump-version
 	gem push lightstep-`ruby scripts/version.rb`.gem
 
-export PATH := /workspace/gopath/bin:$(PATH)
-conformance:
-	bundle
-	runner ruby conformance_test/client.rb
+conformance: cloudbuild.yaml
+	gcloud builds submit --config cloudbuild.yaml .

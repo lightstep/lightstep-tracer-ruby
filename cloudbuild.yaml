@@ -5,4 +5,4 @@ steps:
     args: ['install', 'github.com/lightstep/conformance/runner']
     env: ['PROJECT_ROOT=github.com/lightstep']
   - name: 'ruby'
-    args: ['make', 'conformance']
+    args: ['sh', '-c', 'bundle && gopath/bin/runner ruby conformance_test/client.rb']

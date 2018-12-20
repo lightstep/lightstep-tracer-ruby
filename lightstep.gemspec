@@ -6,7 +6,7 @@ require 'lightstep/version'
 Gem::Specification.new do |spec|
   spec.name          = 'lightstep'
   spec.version       = LightStep::VERSION
-  spec.authors       = ['bcronin']
+  spec.authors       = ['lightstep']
   spec.email         = ['support@lightstep.com']
 
   spec.summary       = 'LightStep OpenTracing Ruby bindings'
@@ -15,6 +15,10 @@ Gem::Specification.new do |spec|
 
   spec.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
   spec.require_paths = ['lib']
+
+  spec.metadata    = {
+    "changelog_uri" => "https://github.com/lightstep/lightstep-tracer-ruby/blob/master/CHANGELOG.md",
+  }
 
   spec.add_dependency 'concurrent-ruby', '~> 1.0'
   spec.add_dependency 'opentracing', '~> 0.4.1'

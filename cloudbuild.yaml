@@ -2,7 +2,7 @@ steps:
   - name: 'gcr.io/cloud-builders/git'
     args: ['clone', 'https://github.com/lightstep/conformance.git']
   - name: 'gcr.io/cloud-builders/go:debian'
-    args: ['install', 'github.com/lightstep/conformance/runner']
+    args: ['install', 'github.com/lightstep/conformance/ls_conformance_runner']
     env: ['PROJECT_ROOT=github.com/lightstep']
   - name: 'ruby'
-    args: ['sh', '-c', 'bundle && gopath/bin/runner ruby conformance_test/client.rb']
+    args: ['sh', '-c', 'bundle && gopath/bin/ls_conformance_runner ruby conformance_test/client.rb']

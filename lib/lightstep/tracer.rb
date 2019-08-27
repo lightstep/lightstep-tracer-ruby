@@ -83,10 +83,12 @@ module LightStep
     #   References#CHILD_OF reference to the ScopeManager#active.
     # @param finish_on_close [Boolean] whether span should automatically be
     #   finished when Scope#close is called
-    # @yield [Scope] If an optional block is passed to start_active it will
+    # @yield [Scope] If an optional block is passed to start_active_span it will
     #   yield the newly-started Scope. If `finish_on_close` is true then the
     #   Span will be finished automatically after the block is executed.
-    # @return [Scope] The newly-started and activated Scope
+    # @return [Scope, Object] If passed an optional block, start_active_span
+    #   returns the block's return value, otherwise it returns the newly-started
+    #   and activated Scope
     def start_active_span(operation_name,
                           child_of: nil,
                           references: nil,
@@ -109,8 +111,9 @@ module LightStep
 
       scope_manager.activate(span: span, finish_on_close: finish_on_close).tap do |scope|
         if block_given?
-          yield scope
-          scope.close
+          return yield(scope).tap do
+            scope.close
+          end
         end
       end
     end
@@ -138,13 +141,19 @@ module LightStep
     # @param tags [Hash] Tags to assign to the Span at start time
     # @param ignore_active_scope [Boolean] whether to create an implicit
     #   References#CHILD_OF reference to the ScopeManager#active.
-    # @return [Span]
+    # @yield [Span] If passed an optional block, start_span will yield the
+    #   newly-created span to the block. The span will be finished automatically
+    #   after the block is executed.
+    # @return [Span, Object] If passed an optional block, start_span will return
+    #  the block's return value, otherwise it returns the newly-started Span
+    #  instance, which has not been automatically registered via the
+    #  ScopeManager
     def start_span(operation_name, child_of: nil, references: nil, start_time: nil, tags: nil, ignore_active_scope: false)
       if child_of.nil? && references.nil? && !ignore_active_scope
         child_of = active_span
       end
 
-      Span.new(
+      span_options = {
         tracer: self,
         operation_name: operation_name,
         child_of: child_of,
@@ -152,7 +161,15 @@ module LightStep
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
         max_log_records: max_log_records,
-      )
+      }
+
+      Span.new(span_options).tap do |span|
+        if block_given?
+          return yield(span).tap do
+            span.finish
+          end
+        end
+      end
     end
 
     # Inject a SpanContext into the given carrier

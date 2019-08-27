@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   }
 
   spec.add_dependency 'concurrent-ruby', '~> 1.0'
-  spec.add_dependency 'opentracing', '~> 0.4.1'
+  spec.add_dependency 'opentracing', '~> 0.5.0'
   spec.add_development_dependency 'rake', '~> 11.3'
   spec.add_development_dependency 'rack', '~> 2.0'
   spec.add_development_dependency 'rspec', '~> 3.0'

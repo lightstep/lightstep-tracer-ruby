@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - A Changelog
 - Now supports Span#log_kv
+- Updated to opentracing-ruby 0.5.0
+- Now delegates Lightstep#active_span to the tracer
+- Now supports passing a block to #start_span
+- The block forms of #start_span and #start active_span now return the result of executing the block
 
 ### Changed
 - Tracer#extract now supports symbols in carrier

@@ -675,6 +675,29 @@ describe LightStep do
         end
       end
     end
+
+    context 'when a block is given' do
+      before(:each) do
+        @result = tracer.start_span('some-operation') do |span|
+          allow(span).to receive(:finish)
+          @span = span
+          "some result"
+        end
+      end
+
+      it 'should return the result of executing the block' do
+        expect(@result).to eq("some result")
+      end
+
+      it 'should yield the span to the block' do
+        expect(@span).to be_an_instance_of(LightStep::Span)
+        expect(@span.to_h[:span_name]).to eq('some-operation')
+      end
+
+      it 'should finish the span before returning' do
+        expect(@span).to have_received(:finish)
+      end
+    end
   end
 
   describe '#start_active_span' do
@@ -700,9 +723,10 @@ describe LightStep do
 
     context 'when a block is given' do
       before(:each) do
-        tracer.start_active_span('some-operation') do |scope|
+        @result = tracer.start_active_span('some-operation') do |scope|
           @scope = scope
           expect(@scope.span.end_micros).to be_nil
+          "some result"
         end
       end
 
@@ -710,6 +734,9 @@ describe LightStep do
         expect(@scope.span.end_micros).not_to be_nil
       end
 
+      it 'should return the result of executing the block' do
+        expect(@result).to eq("some result")
+      end
     end
 
     context 'when finish_on_close is false and a block is given' do

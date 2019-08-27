@@ -109,7 +109,7 @@ module LightStep
     # Add a log entry to this span
     # @param event [String] event name for the log
     # @param timestamp [Time] time of the log
-    # @param fields [Hash] Additional information to log
+    # @param fields [Hash{Symbol=>Object}] Additional information to log
     def log(event: nil, timestamp: Time.now, **fields)
       warn 'Span#log is deprecated. Please use Span#log_kv instead.'
       return unless tracer.enabled?
@@ -122,6 +122,9 @@ module LightStep
       log_kv(timestamp: timestamp, **fields)
     end
 
+    # Add a log entry to this span
+    # @param timestamp [Time] time of the log
+    # @param fields [Hash{Symbol=>Object}] Additional information to log
     def log_kv(timestamp: Time.now, **fields)
       return unless tracer.enabled?
 

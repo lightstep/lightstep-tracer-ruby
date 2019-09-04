@@ -14,7 +14,7 @@ benchmark:
 	ruby benchmark/threading/thread_test.rb
 
 bump-version:
-	ruby -e 'require "bump"; Bump::Bump.run("patch")'
+	ruby -e 'require "bump"; Bump::Bump.run("$(RELEASE_TYPE)")'
 	make build	# rebuild after version increment
 	git tag `ruby scripts/version.rb`
 	git push

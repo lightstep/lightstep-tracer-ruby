@@ -56,8 +56,9 @@ module LightStep
       ref = ref.context if (Span === ref)
 
       if SpanContext === ref
-        @context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id)
+        @context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id, trace_state: ref.trace_state)
         set_baggage(ref.baggage)
+
         set_tag(:parent_span_guid, ref.id)
       else
         @context = SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid)
@@ -83,7 +84,8 @@ module LightStep
       @context = SpanContext.new(
         id: context.id,
         trace_id: context.trace_id,
-        baggage: context.baggage.merge({key => value})
+        baggage: context.baggage.merge({key => value}),
+        trace_state: context.trace_state
       )
       self
     end
@@ -94,7 +96,8 @@ module LightStep
       @context = SpanContext.new(
         id: context.id,
         trace_id: context.trace_id,
-        baggage: baggage
+        baggage: baggage,
+        trace_state: context.trace_state
       )
     end
 
@@ -158,7 +161,7 @@ module LightStep
       {
         runtime_guid: tracer.guid,
         span_guid: context.id,
-        trace_guid: context.trace_id,
+        trace_guid: context.trace_id[-16..-1] || context.trace_id, # Hack to ensure the reported ID is <= 16 bytes
         span_name: operation_name,
         attributes: tags.map {|key, value|
           {Key: key.to_s, Value: value}

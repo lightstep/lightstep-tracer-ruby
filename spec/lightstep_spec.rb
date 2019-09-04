@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'base64'
 
 describe LightStep do
   def init_test_tracer
@@ -11,6 +12,9 @@ describe LightStep do
       transport: LightStep::Transport::Callback.new(callback: callback)
     )
   end
+
+  # Example from https://w3c.github.io/trace-context/#relationship-between-the-headers
+  let(:valid_traceparent) { '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01' }
 
   it 'should return a new tracer from init_new_tracer' do
     tracer = init_test_tracer
@@ -387,6 +391,27 @@ describe LightStep do
     expect(result[:runtime][:attrs]).to include({Key: "user-provided-array", Value: "[]"})
   end
 
+  it 'should truncate IDs to 16 bytes in reports' do
+    result = nil
+    tracer = LightStep::Tracer.new(
+      component_name: 'lightstep/ruby/spec',
+      transport: LightStep::Transport::Callback.new(callback: proc { |obj|; result = obj; })
+    )
+
+    extra_trace_id = (0..15).map { 'x' }.join
+    expected_trace_id = (0..15).map { 'a' }.join
+    trace_id = "#{extra_trace_id}#{expected_trace_id}"
+
+    parent_ctx = LightStep::SpanContext.new(trace_id: trace_id, id: 'test')
+
+    span = tracer.start_span('span', child_of: parent_ctx)
+    span.finish
+    tracer.flush
+
+    expect(result[:span_records].length).to eq(1)
+    expect(result[:span_records][0][:trace_guid]).to eq expected_trace_id
+  end
+
   it 'should handle inject/join for text carriers' do
     tracer = init_test_tracer
     span1 = tracer.start_span('test_span')
@@ -410,51 +435,213 @@ describe LightStep do
     span1.finish
   end
 
-  it 'should handle inject/extract for http requests and rack' do
-    tracer = init_test_tracer
-    span1 = tracer.start_span('test_span')
-    span1.set_baggage_item('footwear', 'cleats')
-    span1.set_baggage_item('umbrella', 'golf')
-    span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
-    span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
+  describe '#inject' do
+    let(:tracer) { init_test_tracer }
 
-    carrier = {}
+    context 'http requests and rack' do
+      it 'should inject the trace ID, span ID, and baggage into the carrier' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('footwear', 'cleats')
+        span1.set_baggage_item('umbrella', 'golf')
 
-    tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
-    expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
-    expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
-    expect(carrier['ot-baggage-footwear']).to eq('cleats')
-    expect(carrier['ot-baggage-umbrella']).to eq('golf')
-    expect(carrier['ot-baggage-unsafeheader']).to be_nil
-    expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
+        carrier = {}
 
-    carrier = carrier.reduce({}) do |memo, tuple|
-      key, value = tuple
-      memo["HTTP_#{key.gsub("-", "_").upcase}"] = value
-      memo
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-tracer-traceid']).not_to be_empty
+        expect(carrier['ot-tracer-traceid']).to eq(span1.context.trace_id)
+        expect(carrier['ot-tracer-spanid']).not_to be_empty
+        expect(carrier['ot-tracer-spanid']).to eq(span1.context.id)
+        expect(carrier['ot-baggage-footwear']).to eq('cleats')
+        expect(carrier['ot-baggage-umbrella']).to eq('golf')
+
+        expected_traceparent = "00-#{span1.context.trace_id.rjust(32, '0')}-#{span1.context.id.rjust(16, '0')}-01"
+        expect(carrier['traceparent']).to eq(expected_traceparent)
+
+        expected_baggage = Base64.urlsafe_encode64(JSON.generate({
+          footwear: 'cleats',
+          umbrella: 'golf'
+        }), padding: false)
+        expected_tracestate = "lightstep=#{expected_baggage}"
+        expect(carrier['tracestate']).to eq(expected_tracestate)
+      end
+
+      it 'should encode case sensitivity and underscores' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('CASE-Sensitivity_Underscores', 'value')
+
+        carrier = {}
+
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-baggage-CASE-Sensitivity_Underscores']).to eq('value')
+
+        expected_baggage = Base64.urlsafe_encode64('{"CASE-Sensitivity_Underscores":"value"}', padding: false)
+        expected_tracestate = "lightstep=#{expected_baggage}"
+        expect(carrier['tracestate']).to eq(expected_tracestate)
+      end
+
+      it 'should not encode unsafe keys into headers' do
+        span1 = tracer.start_span('test_span')
+        span1.set_baggage_item('unsafe!@#$%$^&header', 'value')
+
+        carrier = {}
+
+        tracer.inject(span1.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['ot-baggage-unsafeheader']).to be_nil
+        expect(carrier['ot-baggage-unsafe!@#$%$^&header']).to be_nil
+
+        expected_baggage = Base64.urlsafe_encode64('{"unsafe!@#$%$^&header":"value"}', padding: false)
+        expected_tracestate = "lightstep=#{expected_baggage}"
+        expect(carrier['tracestate']).to eq(expected_tracestate)
+      end
+
+      it 'should encode tracestate with empty baggage' do
+        span = tracer.start_span('test_span')
+
+        carrier = {}
+
+        tracer.inject(span.context, OpenTracing::FORMAT_RACK, carrier)
+        expect(carrier['tracestate']).to eq('lightstep=')
+      end
+    end
+  end
+
+  describe '#extract' do
+    let(:tracer) { init_test_tracer }
+
+    context 'http requests and rack' do
+      it 'should extract the trace ID, span ID, and baggage from the carrier' do
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+          'HTTP_OT_TRACER_SPANID' => '123',
+          'HTTP_OT_BAGGAGE_FOOTWEAR' => 'cleats',
+          'HTTP_OT_BAGGAGE_UMBRELLA' => 'golf',
+        }
+
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx.trace_id).to eq('abc')
+        expect(span_ctx.id).to eq('123')
+        expect(span_ctx.baggage['footwear']).to eq('cleats')
+        expect(span_ctx.baggage['umbrella']).to eq('golf')
+      end
+
+      it 'should extract baggage from tracestate' do
+        encoded_baggage = Base64.urlsafe_encode64(JSON.generate({
+          footwear: 'cleats',
+          umbrella: 'golf'
+        }), padding: false)
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+          'HTTP_OT_TRACER_SPANID' => '123',
+          'TRACESTATE' => "lightstep=#{encoded_baggage}",
+        }
+
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx.baggage['footwear']).to eq('cleats')
+        expect(span_ctx.baggage['umbrella']).to eq('golf')
+      end
+
+      it 'should not need both the tracer and W3C headers together' do
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+          'HTTP_OT_TRACER_SPANID' => '123',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).not_to be_nil
+        expect(span_ctx.trace_id).to eq('abc')
+        expect(span_ctx.id).to eq('123')
+
+        carrier = {
+          'TRACEPARENT' => valid_traceparent,
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).not_to be_nil
+        expect(span_ctx.trace_id).to eq('0af7651916cd43dd8448eb211c80319c')
+        expect(span_ctx.id).to eq('b7ad6b7169203331')
+      end
+
+      it 'should require a trace ID and span ID, or a valid traceparent' do
+        carrier = {}
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'HTTP_OT_TRACER_TRACEID' => 'abc',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'HTTP_OT_TRACER_SPANID' => 'abc',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+
+        carrier = {
+          'TRACEPARENT' => 'invalid',
+        }
+        span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
+        expect(span_ctx).to be_nil
+      end
+    end
+  end
+
+  describe 'tracestate propagation' do
+    let (:tracer) { init_test_tracer }
+
+    it 'should propagate tracestate from other vendors' do
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => 'other=vendor,another=foobar'
+      }
+
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
+
+      new_carrier = {}
+      tracer.inject(span_ctx, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expect(new_carrier['tracestate']).to eq('lightstep=,other=vendor,another=foobar')
     end
 
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, carrier)
-    expect(span_ctx.trace_id).to eq(span1.context.trace_id)
-    expect(span_ctx.id).to eq(span1.context.id)
-    expect(span_ctx.baggage['footwear']).to eq('cleats')
-    expect(span_ctx.baggage['umbrella']).to eq('golf')
-    expect(span_ctx.baggage['unsafe!@#$%$^&header']).to be_nil
-    expect(span_ctx.baggage['unsafeheader']).to be_nil
-    expect(span_ctx.baggage['case-sensitivity-underscores']).to eq('value')
+    it 'should not double-propagate old LightStep tracestate' do
+      encoded_baggage = Base64.urlsafe_encode64('{"umbrella":"golf"}', padding: false)
 
-    # We need both a TRACEID and SPANID.
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_TRACEID' => 'abc123'})
-    expect(span_ctx).to be_nil
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123'})
-    expect(span_ctx).to be_nil
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => "other=vendor,lightstep=#{encoded_baggage},another=foobar"
+      }
 
-    # We need both a TRACEID and SPANID; this has both so it should work.
-    span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, {'HTTP_OT_TRACER_SPANID' => 'abc123', 'HTTP_OT_TRACER_TRACEID' => 'bcd234'})
-    expect(span_ctx.id).to eq('abc123')
-    expect(span_ctx.trace_id).to eq('bcd234')
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
 
-    span1.finish
+      span = tracer.start_span('test', child_of: span_ctx)
+      span.set_baggage_item('footwear', 'cleats')
+
+      new_carrier = {}
+      tracer.inject(span.context, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expected_baggage = Base64.urlsafe_encode64(JSON.generate({
+        umbrella: 'golf',
+        footwear: 'cleats'
+      }), padding: false)
+      expect(new_carrier['tracestate']).to eq("lightstep=#{expected_baggage},other=vendor,another=foobar")
+    end
+
+    it 'should truncate tracestate at 512 bytes' do
+      long_value = (0..1000).map { 'a' }.join
+      original_carrier = {
+        'TRACEPARENT' => valid_traceparent,
+        'TRACESTATE' => "other=vendor,long=#{long_value},another=foobar"
+      }
+
+      span_ctx = tracer.extract(OpenTracing::FORMAT_RACK, original_carrier)
+      expect(span_ctx).not_to be_nil
+
+      new_carrier = {}
+      tracer.inject(span_ctx, OpenTracing::FORMAT_RACK, new_carrier)
+
+      expect(new_carrier['tracestate']).to eq('lightstep=,other=vendor')
+    end
   end
 
   it 'should be able to extract from a carrier with string or symbol keys' do

@@ -1,4 +1,5 @@
 require 'json'
+require 'base64'
 require 'concurrent'
 
 require 'opentracing'
@@ -279,6 +280,14 @@ module LightStep
     DEFAULT_MAX_SPAN_RECORDS = 1000
     MIN_MAX_SPAN_RECORDS = 1
 
+    TRACE_PARENT = 'traceparent'.freeze
+    TRACE_PARENT_VERSION = 0
+    TRACE_PARENT_REGEX = /\h{2}-(\h{32})-(\h{16})-\h{2}/
+
+    TRACE_STATE = 'tracestate'.freeze
+    TRACE_STATE_VENDOR = 'lightstep'.freeze
+    MAX_TRACE_STATE_SIZE = 512
+
     def inject_to_text_map(span_context, carrier)
       carrier[CARRIER_SPAN_ID] = span_context.id
       carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
@@ -290,9 +299,20 @@ module LightStep
     end
 
     def extract_from_text_map(carrier)
+      trace_id = carrier[CARRIER_TRACE_ID]
+      id = carrier[CARRIER_SPAN_ID]
+
+      if trace_id.nil? || trace_id.empty? || id.nil? || id.empty?
+        matches = TRACE_PARENT_REGEX.match(carrier[TRACE_PARENT])
+        unless matches.nil?
+          trace_id = matches[1]
+          id = matches[2]
+        end
+      end
+
       # If the carrier does not have both the span_id and trace_id key
       # skip the processing and just return a normal span
-      if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
+      if trace_id.nil? || trace_id.empty? || id.nil? || id.empty?
         return nil
       end
 
@@ -304,10 +324,25 @@ module LightStep
         end
         baggage
       end
+
+      trace_state = (carrier[TRACE_STATE] || '').split(',')
+        .map { |item| item.match(/^(.*)=(.*)$/).captures }
+        .find_all { |vendor, state| !vendor.nil? && !vendor.empty? && !state.nil? }
+        .reduce([]) do |memo, (vendor, value)|
+          if vendor == TRACE_STATE_VENDOR
+            baggage = baggage.merge(decode_tracestate_baggage(value))
+          else
+            memo << "#{vendor}=#{value}"
+          end
+
+          memo
+        end
+
       SpanContext.new(
-        id: carrier[CARRIER_SPAN_ID],
-        trace_id: carrier[CARRIER_TRACE_ID],
+        id: id,
+        trace_id: trace_id,
         baggage: baggage,
+        trace_state: trace_state
       )
     end
 
@@ -315,14 +350,38 @@ module LightStep
       carrier[CARRIER_SPAN_ID] = span_context.id
       carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
       carrier[CARRIER_SAMPLED] = 'true'
+      carrier[TRACE_PARENT] = format('%<version>02x-%<trace_id>s-%<span_id>s-01', {
+        version: TRACE_PARENT_VERSION,
+        trace_id: span_context.trace_id.rjust(32, '0'),
+        span_id: span_context.id.rjust(16, '0')
+      })
 
-      span_context.baggage.each do |key, value|
+      span_context.baggage.sort.each do |key, value|
         if key =~ /[^A-Za-z0-9\-_]/
           # TODO: log the error internally
           next
         end
+
         carrier[CARRIER_BAGGAGE_PREFIX + key] = value
       end
+
+      encoded_baggage = ''
+
+      unless span_context.baggage.empty?
+        encoded_baggage = Base64.urlsafe_encode64(JSON.generate(span_context.baggage), padding: false)
+      end
+
+      trace_state = "#{TRACE_STATE_VENDOR}=#{encoded_baggage}"
+
+      for item in span_context.trace_state
+        if trace_state.length + item.length + 1 > MAX_TRACE_STATE_SIZE
+          break
+        end
+
+        trace_state << ',' << item
+      end
+
+      carrier[TRACE_STATE] = trace_state
     end
 
     def extract_from_rack(env)
@@ -330,9 +389,19 @@ module LightStep
         raw_header, value = tuple
         header = raw_header.to_s.gsub(/^HTTP_/, '').tr('_', '-').downcase
 
-        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
+        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX) || header == TRACE_PARENT || header == TRACE_STATE
         memo
       })
+    end
+
+    def decode_tracestate_baggage(value)
+      begin
+        decoded_baggage = Base64.urlsafe_decode64(value || '')
+      rescue ArgumentError
+        decoded_baggage = nil
+      end
+
+      JSON.parse(decoded_baggage)
     end
   end
 end

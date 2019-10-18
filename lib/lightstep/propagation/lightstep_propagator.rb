@@ -65,8 +65,7 @@ module LightStep
           return nil
         end
 
-        baggage = carrier.reduce({}) do |baggage, tuple|
-          key, value = tuple
+        baggage = carrier.reduce({}) do |baggage, (key, value)|
           if key.start_with?(CARRIER_BAGGAGE_PREFIX)
             plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
             baggage[plain_key] = value
@@ -95,9 +94,8 @@ module LightStep
       end
 
       def extract_from_rack(env)
-        extract_from_text_map(env.reduce({}){|memo, tuple|
-          raw_header, value = tuple
-          header = raw_header.to_s.gsub(/^HTTP_/, '').tr('_', '-').downcase
+        extract_from_text_map(env.reduce({}){|memo, (raw_header, value)|
+          header = raw_header.to_s.gsub(/^HTTP_/, '').tr!('_', '-').downcase!
 
           memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
           memo

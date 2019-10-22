@@ -53,7 +53,7 @@ module LightStep
           carrier[self.class::CARRIER_TRACE_ID] = trace_id
         end
         carrier[self.class::CARRIER_SPAN_ID] = span_context.id
-        carrier[self.class::CARRIER_SAMPLED] = 'true'
+        carrier[self.class::CARRIER_SAMPLED] = sampled_flag_from_ctx(span_context)
 
         span_context.baggage.each do |key, value|
           carrier[self.class::CARRIER_BAGGAGE_PREFIX + key] = value
@@ -78,6 +78,7 @@ module LightStep
         SpanContext.new(
           id: carrier[self.class::CARRIER_SPAN_ID],
           trace_id: carrier[self.class::CARRIER_TRACE_ID],
+          sampled: sampled_flag_from_carrier(carrier),
           baggage: baggage,
         )
       end
@@ -87,7 +88,7 @@ module LightStep
           carrier[self.class::CARRIER_TRACE_ID] = trace_id
         end
         carrier[self.class::CARRIER_SPAN_ID] = span_context.id
-        carrier[self.class::CARRIER_SAMPLED] = 'true'
+        carrier[self.class::CARRIER_SAMPLED] = sampled_flag_from_ctx(span_context)
 
         span_context.baggage.each do |key, value|
           if key =~ /[^A-Za-z0-9\-_]/
@@ -110,6 +111,14 @@ module LightStep
 
       def trace_id_from_ctx(ctx)
         ctx.trace_id
+      end
+
+      def sampled_flag_from_ctx(_)
+        'true'
+      end
+
+      def sampled_flag_from_carrier(_)
+        true
       end
     end
   end

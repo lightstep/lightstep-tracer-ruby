@@ -26,6 +26,14 @@ describe LightStep::Propagation::B3Propagator do
       baggage: baggage
     )
   end
+  let(:unsampled_span_context) do
+    LightStep::SpanContext.new(
+      id: span_id,
+      trace_id: trace_id,
+      sampled: true,
+      baggage: baggage
+    )
+  end
 
   it 'should handle inject/join for text carriers' do
     carrier = {}
@@ -33,6 +41,7 @@ describe LightStep::Propagation::B3Propagator do
     propagator.inject(span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(carrier['x-b3-traceid']).to eq(trace_id)
     expect(carrier['x-b3-spanid']).to eq(span_id)
+    expect(carrier['x-b3-sampled']).to eq('1')
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
 
@@ -55,6 +64,7 @@ describe LightStep::Propagation::B3Propagator do
     propagator.inject(span_context, OpenTracing::FORMAT_RACK, carrier)
     expect(carrier['x-b3-traceid']).to eq(trace_id)
     expect(carrier['x-b3-spanid']).to eq(span_id)
+    expect(carrier['x-b3-sampled']).to eq('1')
     expect(carrier['ot-baggage-footwear']).to eq('cleats')
     expect(carrier['ot-baggage-umbrella']).to eq('golf')
     expect(carrier['ot-baggage-unsafeheader']).to be_nil
@@ -98,23 +108,27 @@ describe LightStep::Propagation::B3Propagator do
     carrier_with_strings = {
       'HTTP_X_B3_TRACEID' => trace_id,
       'HTTP_X_B3_SPANID' => span_id,
+      'HTTP_X_B3_SAMPLED' => '1'
     }
     string_ctx = propagator.extract(OpenTracing::FORMAT_RACK, carrier_with_strings)
 
     expect(string_ctx).not_to be_nil
     expect(string_ctx.trace_id16).to eq(trace_id)
     expect(string_ctx.trace_id).to eq(trace_id_low_bytes)
+    expect(string_ctx).to be_sampled
     expect(string_ctx.id).to eq(span_id)
 
     carrier_with_symbols = {
       HTTP_X_B3_TRACEID: trace_id,
       HTTP_X_B3_SPANID: span_id,
+      HTTP_X_B3_SAMPLED: '1'
     }
     symbol_ctx = propagator.extract(OpenTracing::FORMAT_RACK, carrier_with_symbols)
 
     expect(symbol_ctx).not_to be_nil
     expect(symbol_ctx.trace_id16).to eq(trace_id)
     expect(symbol_ctx.trace_id).to eq(trace_id_low_bytes)
+    expect(string_ctx).to be_sampled
     expect(symbol_ctx.id).to eq(span_id)
   end
 
@@ -148,12 +162,34 @@ describe LightStep::Propagation::B3Propagator do
     carrier = {
       'x-b3-traceid' => trace_id_low_bytes,
       'x-b3-spanid' => span_id,
-      'x-b3-sampled' => 'true'
+      'x-b3-sampled' => '1'
     }
 
     extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(extracted_ctx.trace_id16).to eq('0' * 16 << trace_id_low_bytes)
     expect(extracted_ctx.trace_id).to eq(trace_id_low_bytes)
+  end
+
+  it 'interprets a true sampled flag properly' do
+    carrier = {
+      'x-b3-traceid' => trace_id,
+      'x-b3-spanid' => span_id,
+      'x-b3-sampled' => '1'
+    }
+
+    extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
+    expect(extracted_ctx).to be_sampled
+  end
+
+  it 'interprets a false sampled flag properly' do
+    carrier = {
+      'x-b3-traceid' => trace_id,
+      'x-b3-spanid' => span_id,
+      'x-b3-sampled' => '0'
+    }
+
+    extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
+    expect(extracted_ctx).not_to be_sampled
   end
 
   def to_rack_env(input_hash)

@@ -3,14 +3,16 @@
 module LightStep
   # SpanContext holds the data for a span that gets inherited to child spans
   class SpanContext
-    attr_reader :id, :trace_id, :trace_id16, :baggage
+    attr_reader :id, :trace_id, :trace_id16, :sampled, :baggage
+    alias_method :sampled?, :sampled
 
     ZERO_PADDING = '0' * 16
 
-    def initialize(id:, trace_id:, baggage: {})
+    def initialize(id:, trace_id:, sampled: true, baggage: {})
       @id = id.freeze
       @trace_id16 = pad_id(trace_id).freeze
       @trace_id = truncate_id(trace_id).freeze
+      @sampled = sampled
       @baggage = baggage.freeze
     end
 

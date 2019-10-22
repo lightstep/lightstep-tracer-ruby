@@ -124,13 +124,40 @@ describe LightStep::Propagation::LightStepPropagator do
     carrier = {
       'ot-tracer-traceid' => trace_id16,
       'ot-tracer-spanid' => span_id,
-      'x-b3-sampled' => 'true'
+      'ot-tracer-sampled' => 'true'
     }
 
     extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
     expect(extracted_ctx.trace_id16).to eq(trace_id16)
     expect(extracted_ctx.trace_id).to eq(trace_id)
     expect(extracted_ctx.trace_id.size).to eq(16)
+  end
+
+  it 'always propagates a true sampled flag' do
+    [true, false].each do |sampled|
+      ctx = LightStep::SpanContext.new(
+        id: span_id,
+        trace_id: trace_id,
+        sampled: sampled,
+        baggage: baggage
+      )
+      carrier = {}
+      propagator.inject(span_context, OpenTracing::FORMAT_TEXT_MAP, carrier)
+      expect(carrier['ot-tracer-sampled']).to eq('true')
+    end
+  end
+
+  it 'always extracts a true sampled flag' do
+    ['true', 'false'].each do |sampled|
+       carrier = {
+          'ot-tracer-traceid' => trace_id,
+          'ot-tracer-spanid' => span_id,
+          'ot-tracer-sampled' => sampled
+        }
+
+      extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
+      expect(extracted_ctx).to be_sampled
+    end
   end
 
   def to_rack_env(input_hash)

@@ -239,7 +239,11 @@ module LightStep
 
     protected
 
-    def configure(component_name:, access_token: nil, transport: nil, tags: {}, propagator: nil)
+    def configure(component_name:,
+                  access_token: nil,
+                  transport: nil, tags: {},
+                  propagator: Propagation::LightStepPropagator.new)
+
       raise ConfigurationError, "component_name must be a string" unless component_name.is_a?(String)
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 

@@ -250,7 +250,6 @@ module LightStep
       raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
       raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
 
-      #@todo: check propagator type
       @propagator = propagator
 
       @guid = LightStep.guid

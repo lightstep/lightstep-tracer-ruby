@@ -49,8 +49,10 @@ module LightStep
       private
 
       def inject_to_text_map(span_context, carrier)
+        if trace_id = trace_id_from_ctx(span_context)
+          carrier[self.class::CARRIER_TRACE_ID] = trace_id
+        end
         carrier[self.class::CARRIER_SPAN_ID] = span_context.id
-        carrier[self.class::CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
         carrier[self.class::CARRIER_SAMPLED] = 'true'
 
         span_context.baggage.each do |key, value|
@@ -81,8 +83,10 @@ module LightStep
       end
 
       def inject_to_rack(span_context, carrier)
+        if trace_id = trace_id_from_ctx(span_context)
+          carrier[self.class::CARRIER_TRACE_ID] = trace_id
+        end
         carrier[self.class::CARRIER_SPAN_ID] = span_context.id
-        carrier[self.class::CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
         carrier[self.class::CARRIER_SAMPLED] = 'true'
 
         span_context.baggage.each do |key, value|
@@ -102,6 +106,10 @@ module LightStep
                                                      self.class::CARRIER_BAGGAGE_PREFIX)
           memo
         })
+      end
+
+      def trace_id_from_ctx(ctx)
+        ctx.trace_id
       end
     end
   end

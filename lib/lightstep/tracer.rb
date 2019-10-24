@@ -28,14 +28,15 @@ module LightStep
     # @param access_token [String] The project access token when pushing to LightStep
     # @param transport [LightStep::Transport] How the data should be transported
     # @param tags [Hash] Tracer-level tags
-    # @param propagator [Propagator] Propagator to pass context over process boundaries
+    # @param propagator [Propagator] Symbol one of :lightstep, :b3 indicating the propgator
+    #   to use
     # @return LightStep::Tracer
     # @raise LightStep::ConfigurationError if the group name or access token is not a valid string.
     def initialize(component_name:,
                    access_token: nil,
                    transport: nil,
                    tags: {},
-                   propagator: Propagation::LightStepPropagator.new)
+                   propagator: :lightstep)
       configure(component_name: component_name,
                 access_token: access_token,
                 transport: transport,
@@ -242,7 +243,7 @@ module LightStep
     def configure(component_name:,
                   access_token: nil,
                   transport: nil, tags: {},
-                  propagator: Propagation::LightStepPropagator.new)
+                  propagator: :lightstep)
 
       raise ConfigurationError, "component_name must be a string" unless component_name.is_a?(String)
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
@@ -254,7 +255,7 @@ module LightStep
       raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
       raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
 
-      @propagator = propagator
+      @propagator = Propagation[propagator]
 
       @guid = LightStep.guid
 

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.16.0
+### Added
+- The tracer now supports B3 context propagation. Propagation can be set by using the `propagator` keyword argument to `Tracer#configure`. Valid values are `:lightstep` (default), and `:b3`.
+
 ## v0.15.0
 ### Added
 - A Changelog

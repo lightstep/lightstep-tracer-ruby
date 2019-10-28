@@ -72,6 +72,20 @@ describe LightStep do
     expect(child_span.span_context.baggage).to eq(parent_span.span_context.baggage)
   end
 
+  it 'should inherit true sampled flag from parent span' do
+    tracer = init_test_tracer
+    parent_ctx = LightStep::SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid, sampled: true)
+    child_span = tracer.start_span('child_span', child_of: parent_ctx)
+    expect(child_span.span_context).to be_sampled
+  end
+
+  it 'should inherit false sampled flag from parent span' do
+    tracer = init_test_tracer
+    parent_ctx = LightStep::SpanContext.new(id: LightStep.guid, trace_id: LightStep.guid, sampled: false)
+    child_span = tracer.start_span('child_span', child_of: parent_ctx)
+    expect(child_span.span_context).not_to be_sampled
+  end
+
   it 'should allow operation_name updates' do
     tracer = init_test_tracer
     span = tracer.start_span('original')

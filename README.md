@@ -28,7 +28,7 @@ Or install it yourself as:
     LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token')
 
     # Specify a propagation format (options are :lightstep (default) and :b3)
-    LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token', :propagator :b3)
+    LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token', propagator: :b3)
 
     # Create a basic span and attach a log to the span
     span = LightStep.start_span('my_span')

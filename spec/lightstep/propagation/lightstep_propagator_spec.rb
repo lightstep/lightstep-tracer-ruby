@@ -3,7 +3,7 @@ require 'spec_helper'
 describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
   let(:propagator) { subject }
   let(:trace_id) { LightStep.guid }
-  let(:padded_trace_id) { '0' * 16 << trace_id }
+  let(:padded_trace_id) { trace_id + '0' * 16 }
   let(:span_id) { LightStep.guid }
   let(:baggage) do
     {
@@ -153,7 +153,7 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
     end
 
     it 'maintains 8 and 16 byte trace ids' do
-      trace_id16 = [LightStep.guid, trace_id].join
+      trace_id16 = [trace_id, LightStep.guid].join
 
       carrier = {
         'ot-tracer-traceid' => trace_id16,

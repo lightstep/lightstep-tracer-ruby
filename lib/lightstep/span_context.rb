@@ -20,12 +20,12 @@ module LightStep
 
     def truncate_id(id)
       return id unless id && id.size == 32
-      id[16..-1]
+      id[0...16]
     end
 
     def pad_id(id)
       return id unless id && id.size == 16
-      "#{ZERO_PADDING}#{id}"
+      "#{id}#{ZERO_PADDING}"
     end
   end
 end

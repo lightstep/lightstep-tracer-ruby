@@ -127,7 +127,9 @@ module LightStep
 
       scope_manager.activate(span: span, finish_on_close: finish_on_close).tap do |scope|
         if block_given?
-          return yield(scope).tap do
+          begin
+            return yield scope
+          ensure
             scope.close
           end
         end
@@ -181,7 +183,9 @@ module LightStep
 
       Span.new(span_options).tap do |span|
         if block_given?
-          return yield(span).tap do
+          begin
+            return yield span
+          ensure
             span.finish
           end
         end

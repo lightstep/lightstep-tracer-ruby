@@ -711,6 +711,19 @@ describe LightStep do
       it 'should finish the span before returning' do
         expect(@span).to have_received(:finish)
       end
+
+      it "should close the span when there is an error" do
+        @span = nil
+        begin
+          tracer.start_span('some-operation') do |span|
+            allow(span).to receive(:finish)
+            @span = span
+            raise StandardError
+          end
+        rescue
+        end
+        expect(@span).to have_received(:finish)
+      end
     end
   end
 
@@ -763,6 +776,19 @@ describe LightStep do
 
       it 'should not finish the span after the block finishes yielding' do
         expect(@scope.span.end_micros).to be_nil
+      end
+
+      it 'closes the scope when there is an error' do
+        @scope = nil
+        begin
+          tracer.start_active_span('some-operation', finish_on_close: false) do |scope|
+            allow(scope).to receive(:close)
+            @scope = scope
+            raise StandardError
+          end
+        rescue StandardError
+        end
+        expect(@scope).to have_received(:close)
       end
     end
 

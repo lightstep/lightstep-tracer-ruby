@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    lightstep (0.15.0)
+    lightstep (0.16.0)
       concurrent-ruby (~> 1.0)
       opentracing (~> 0.5.0)
 

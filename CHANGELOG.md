@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The tracer now supports B3 context propagation. Propagation can be set by using the `propagator` keyword argument to `LightStep.configure`. Valid values are `:lightstep` (default), and `:b3`.
 - The tracer now closes the active scope or finishes the active span even if an error is raised from the yielded code.
 
+### Unreleased
+- In-progress B3 support
+
 ## v0.15.0
 ### Added
 - A Changelog

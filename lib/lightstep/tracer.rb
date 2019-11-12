@@ -28,7 +28,7 @@ module LightStep
     # @param access_token [String] The project access token when pushing to LightStep
     # @param transport [LightStep::Transport] How the data should be transported
     # @param tags [Hash] Tracer-level tags
-    #v@param propagator [Propagator] Symbol one of :lightstep, :b3 indicating the propgator
+    # @param propagator [Propagator] Symbol one of :lightstep, :b3 indicating the propagator
     #   to use
     # @return LightStep::Tracer
     # @raise LightStep::ConfigurationError if the group name or access token is not a valid string.

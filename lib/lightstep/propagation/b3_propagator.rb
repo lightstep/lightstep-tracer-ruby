@@ -7,6 +7,7 @@ module LightStep
       CARRIER_SPAN_ID = 'x-b3-spanid'
       CARRIER_TRACE_ID = 'x-b3-traceid'
       CARRIER_SAMPLED = 'x-b3-sampled'
+      TRUE_VALUES = %w[1 true].freeze
 
       private
 
@@ -21,7 +22,7 @@ module LightStep
       end
 
       def sampled_flag_from_carrier(carrier)
-        carrier[self.class::CARRIER_SAMPLED] == '1' ? true : false
+        TRUE_VALUES.include?(carrier[self.class::CARRIER_SAMPLED])
       end
     end
   end

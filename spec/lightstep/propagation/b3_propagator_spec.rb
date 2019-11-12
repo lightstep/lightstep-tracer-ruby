@@ -196,25 +196,29 @@ describe LightStep::Propagation::B3Propagator, :rack_helpers do
     end
 
     it 'interprets a true sampled flag properly' do
-      carrier = {
-        'x-b3-traceid' => trace_id64,
-        'x-b3-spanid' => span_id,
-        'x-b3-sampled' => '1'
-      }
+      %w[1 true].each do |sampled_value|
+        carrier = {
+          'x-b3-traceid' => trace_id64,
+          'x-b3-spanid' => span_id,
+          'x-b3-sampled' => sampled_value
+        }
 
-      extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
-      expect(extracted_ctx).to be_sampled
+        extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
+        expect(extracted_ctx).to be_sampled
+      end
     end
 
     it 'interprets a false sampled flag properly' do
-      carrier = {
-        'x-b3-traceid' => trace_id64,
-        'x-b3-spanid' => span_id,
-        'x-b3-sampled' => '0'
-      }
+      %w[0 false].each do |sampled_value|
+        carrier = {
+          'x-b3-traceid' => trace_id64,
+          'x-b3-spanid' => span_id,
+          'x-b3-sampled' => sampled_value
+        }
 
-      extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
-      expect(extracted_ctx).not_to be_sampled
+        extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
+        expect(extracted_ctx).not_to be_sampled
+      end
     end
   end
 end

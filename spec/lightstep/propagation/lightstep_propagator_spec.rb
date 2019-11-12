@@ -3,7 +3,7 @@ require 'spec_helper'
 describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
   let(:propagator) { subject }
   let(:trace_id) { LightStep.guid }
-  let(:padded_trace_id) { trace_id + '0' * 16 }
+  let(:padded_trace_id) { '0' * 16 << trace_id  }
   let(:span_id) { LightStep.guid }
   let(:baggage) do
     {
@@ -77,7 +77,7 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
       extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
 
       expect(extracted_ctx.trace_id).to eq(trace_id)
-      expect(extracted_ctx.trace_id16).to eq(padded_trace_id)
+      expect(extracted_ctx.trace_id128).to eq(padded_trace_id)
       expect(extracted_ctx.id).to eq(span_id)
       expect(extracted_ctx.baggage['footwear']).to eq('cleats')
       expect(extracted_ctx.baggage['umbrella']).to eq('golf')
@@ -94,7 +94,7 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
       extracted_ctx = propagator.extract(OpenTracing::FORMAT_RACK, to_rack_env(carrier))
 
       expect(extracted_ctx.trace_id).to eq(trace_id)
-      expect(extracted_ctx.trace_id16).to eq(padded_trace_id)
+      expect(extracted_ctx.trace_id128).to eq(padded_trace_id)
       expect(extracted_ctx.id).to eq(span_id)
       expect(extracted_ctx.baggage['footwear']).to eq('cleats')
       expect(extracted_ctx.baggage['umbrella']).to eq('golf')
@@ -123,7 +123,7 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
       )
       expect(extracted_ctx.id).to eq(span_id)
       expect(extracted_ctx.trace_id).to eq(trace_id)
-      expect(extracted_ctx.trace_id16).to eq(padded_trace_id)
+      expect(extracted_ctx.trace_id128).to eq(padded_trace_id)
     end
 
     it 'handles carriers with string keys' do
@@ -135,7 +135,7 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
 
       expect(extracted_ctx).not_to be_nil
       expect(extracted_ctx.trace_id).to eq(trace_id)
-      expect(extracted_ctx.trace_id16).to eq(padded_trace_id)
+      expect(extracted_ctx.trace_id128).to eq(padded_trace_id)
       expect(extracted_ctx.id).to eq(span_id)
     end
 
@@ -148,22 +148,22 @@ describe LightStep::Propagation::LightStepPropagator, :rack_helpers do
 
       expect(extracted_ctx).not_to be_nil
       expect(extracted_ctx.trace_id).to eq(trace_id)
-      expect(extracted_ctx.trace_id16).to eq(padded_trace_id)
+      expect(extracted_ctx.trace_id128).to eq(padded_trace_id)
       expect(extracted_ctx.id).to eq(span_id)
     end
 
     it 'maintains 8 and 16 byte trace ids' do
-      trace_id16 = [trace_id, LightStep.guid].join
+      trace_id128 = [LightStep.guid, trace_id].join
 
       carrier = {
-        'ot-tracer-traceid' => trace_id16,
+        'ot-tracer-traceid' => trace_id128,
         'ot-tracer-spanid' => span_id,
         'ot-tracer-sampled' => 'true'
       }
 
       extracted_ctx = propagator.extract(OpenTracing::FORMAT_TEXT_MAP, carrier)
-      expect(extracted_ctx.trace_id16).to eq(trace_id16)
-      expect(extracted_ctx.trace_id16.size).to eq(32)
+      expect(extracted_ctx.trace_id128).to eq(trace_id128)
+      expect(extracted_ctx.trace_id128.size).to eq(32)
       expect(extracted_ctx.trace_id).to eq(trace_id)
       expect(extracted_ctx.trace_id.size).to eq(16)
     end

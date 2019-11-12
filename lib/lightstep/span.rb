@@ -56,7 +56,11 @@ module LightStep
       ref = ref.context if (Span === ref)
 
       if SpanContext === ref
-        @context = SpanContext.new(id: LightStep.guid, trace_id: ref.trace_id, sampled: ref.sampled?)
+        @context = SpanContext.new(
+          id: LightStep.guid,
+          trace_id: ref.trace_id,
+          trace_id_upper64: ref.trace_id_upper64,
+          sampled: ref.sampled?)
         set_baggage(ref.baggage)
         set_tag(:parent_span_guid, ref.id)
       else
@@ -83,6 +87,7 @@ module LightStep
       @context = SpanContext.new(
         id: context.id,
         trace_id: context.trace_id,
+        trace_id_upper64: context.trace_id_upper64,
         sampled: context.sampled?,
         baggage: context.baggage.merge({key => value})
       )
@@ -95,6 +100,7 @@ module LightStep
       @context = SpanContext.new(
         id: context.id,
         trace_id: context.trace_id,
+        trace_id_upper64: context.trace_id_upper64,
         sampled: context.sampled?,
         baggage: baggage
       )

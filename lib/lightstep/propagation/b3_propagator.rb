@@ -10,8 +10,10 @@ module LightStep
 
       private
 
+      # propagate the full 128-bit trace id if the original id was 128-bit,
+      # use the 64 bit id otherwise
       def trace_id_from_ctx(ctx)
-        ctx.trace_id16
+        ctx.id_truncated? ? ctx.trace_id128 : ctx.trace_id64
       end
 
       def sampled_flag_from_ctx(ctx)

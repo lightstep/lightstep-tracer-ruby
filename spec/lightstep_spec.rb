@@ -86,6 +86,28 @@ describe LightStep do
     expect(child_span.span_context).not_to be_sampled
   end
 
+  it 'should handle 64-bit trace id from parent' do
+    tracer = init_test_tracer
+    trace_id = LightStep.guid
+    parent_ctx = LightStep::SpanContext.new(id: LightStep.guid, trace_id: trace_id)
+    child_span = tracer.start_span('child_span', child_of: parent_ctx)
+    child_ctx = child_span.span_context
+    expect(child_ctx.trace_id).to eq(trace_id)
+    expect(child_ctx.id_truncated?).to be(false)
+  end
+
+  it 'should handle 128-bit trace id from parent' do
+    tracer = init_test_tracer
+    trace_id = LightStep.guid
+    trace_id128 = [LightStep.guid, trace_id].join
+    parent_ctx = LightStep::SpanContext.new(id: LightStep.guid, trace_id: trace_id128)
+    child_span = tracer.start_span('child_span', child_of: parent_ctx)
+    child_ctx = child_span.span_context
+    expect(child_ctx.trace_id).to eq(trace_id)
+    expect(child_ctx.id_truncated?).to be(true)
+    expect(child_ctx.trace_id128).to eq(trace_id128)
+  end
+
   it 'should allow operation_name updates' do
     tracer = init_test_tracer
     span = tracer.start_span('original')

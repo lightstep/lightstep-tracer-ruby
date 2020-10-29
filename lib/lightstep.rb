@@ -15,6 +15,8 @@ module LightStep
 
   def_delegator :instance, :configure
   def_delegator :instance, :start_span
+  def_delegator :instance, :start_active_span
+  def_delegator :instance, :active_span
   def_delegator :instance, :disable
   def_delegator :instance, :enable
   def_delegator :instance, :flush
@@ -45,3 +47,5 @@ end
 
 require 'lightstep/tracer'
 require 'lightstep/global_tracer'
+require 'lightstep/scope'
+require 'lightstep/scope_manager'

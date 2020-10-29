@@ -1,0 +1,32 @@
+version: 2
+
+jobs:
+  test-ruby-24:
+    docker:
+      - image: circleci/ruby:2.4-stretch
+    steps:
+      - checkout
+      - run: gem install --no-document bundler && bundle install --jobs=3 --retry=3
+      - run: bundle exec rake
+  test-ruby-25:
+    docker:
+      - image: circleci/ruby:2.5-stretch
+    steps:
+      - checkout
+      - run: gem install --no-document bundler && bundle install --jobs=3 --retry=3
+      - run: bundle exec rake
+  test-ruby-26:
+    docker:
+      - image: circleci/ruby:2.6-stretch
+    steps:
+      - checkout
+      - run: gem install --no-document bundler && bundle install --jobs=3 --retry=3
+      - run: bundle exec rake
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test-ruby-24
+      - test-ruby-25
+      - test-ruby-26

@@ -1,6 +1,5 @@
 .bundle/
 .yardoc
-Gemfile.lock
 _yardoc/
 coverage/
 /doc/
@@ -8,6 +7,6 @@ coverage/
 /spec/reports/
 /tmp/
 *~
-Gemfile.lock
 lightstep-tracer*.gem
 lightstep*.gem
+.idea/

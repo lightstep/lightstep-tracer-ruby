@@ -1,6 +1,6 @@
 # lightstep-tracer-ruby
 
-[![Gem Version](https://badge.fury.io/rb/lightstep-tracer.svg)](https://badge.fury.io/rb/lightstep-tracer) [![Circle CI](https://circleci.com/gh/lightstep/lightstep-tracer-ruby.svg?style=shield)](https://circleci.com/gh/lightstep/lightstep-tracer-ruby) [![MIT license](http://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT) [![Code Climate](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby/badges/gpa.svg)](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby)
+[![Gem Version](https://badge.fury.io/rb/lightstep.svg)](https://badge.fury.io/rb/lightstep) [![Circle CI](https://circleci.com/gh/lightstep/lightstep-tracer-ruby.svg?style=shield)](https://circleci.com/gh/lightstep/lightstep-tracer-ruby) [![MIT license](http://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT) [![Code Climate](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby/badges/gpa.svg)](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby)
 
 The LightStep distributed tracing library for Ruby.
 
@@ -26,6 +26,9 @@ Or install it yourself as:
 
     # Initialize the singleton tracer
     LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token')
+
+    # Specify a propagation format (options are :lightstep (default) and :b3)
+    LightStep.configure(component_name: 'lightstep/ruby/example', access_token: 'your_access_token', propagator: :b3)
 
     # Create a basic span and attach a log to the span
     span = LightStep.start_span('my_span')

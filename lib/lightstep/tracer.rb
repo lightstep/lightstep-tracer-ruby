@@ -5,6 +5,7 @@ require 'opentracing'
 
 require 'lightstep/span'
 require 'lightstep/reporter'
+require 'lightstep/propagation'
 require 'lightstep/transport/http_json'
 require 'lightstep/transport/nil'
 require 'lightstep/transport/callback'
@@ -14,6 +15,11 @@ module LightStep
     class Error < LightStep::Error; end
     class ConfigurationError < LightStep::Tracer::Error; end
 
+    DEFAULT_MAX_LOG_RECORDS = 1000
+    MIN_MAX_LOG_RECORDS = 1
+    DEFAULT_MAX_SPAN_RECORDS = 1000
+    MIN_MAX_SPAN_RECORDS = 1
+
     attr_reader :access_token, :guid
 
     # Initialize a new tracer. Either an access_token or a transport must be
@@ -22,10 +28,20 @@ module LightStep
     # @param access_token [String] The project access token when pushing to LightStep
     # @param transport [LightStep::Transport] How the data should be transported
     # @param tags [Hash] Tracer-level tags
+    # @param propagator [Propagator] Symbol one of :lightstep, :b3 indicating the propagator
+    #   to use
     # @return LightStep::Tracer
     # @raise LightStep::ConfigurationError if the group name or access token is not a valid string.
-    def initialize(component_name:, access_token: nil, transport: nil, tags: {})
-      configure(component_name: component_name, access_token: access_token, transport: transport, tags: tags)
+    def initialize(component_name:,
+                   access_token: nil,
+                   transport: nil,
+                   tags: {},
+                   propagator: :lightstep)
+      configure(component_name: component_name,
+                access_token: access_token,
+                transport: transport,
+                tags: tags,
+                propagator: propagator)
     end
 
     def max_log_records
@@ -53,25 +69,129 @@ module LightStep
 
     # TODO(bhs): Support FollowsFrom and multiple references
 
+    # Creates a scope manager or returns the already-created one.
+    #
+    # @return [ScopeManager] the current ScopeManager, which may be a no-op but
+    #   may not be nil.
+    def scope_manager
+      @scope_manager ||= LightStep::ScopeManager.new
+    end
+
+    # Returns a newly started and activated Scope.
+    #
+    # If ScopeManager#active is not nil, no explicit references are provided,
+    # and `ignore_active_scope` is false, then an inferred References#CHILD_OF
+    # reference is created to the ScopeManager#active's SpanContext when
+    # start_active_span is invoked.
+    #
+    # @param operation_name [String] The operation name for the Span
+    # @param child_of [SpanContext, Span] SpanContext that acts as a parent to
+    #        the newly-started Span. If a Span instance is provided, its
+    #        context is automatically substituted. See [Reference] for more
+    #        information.
+    #
+    #   If specified, the `references` parameter must be omitted.
+    # @param references [Array<Reference>] An array of reference
+    #   objects that identify one or more parent SpanContexts.
+    # @param start_time [Time] When the Span started, if not now
+    # @param tags [Hash] Tags to assign to the Span at start time
+    # @param ignore_active_scope [Boolean] whether to create an implicit
+    #   References#CHILD_OF reference to the ScopeManager#active.
+    # @param finish_on_close [Boolean] whether span should automatically be
+    #   finished when Scope#close is called
+    # @yield [Scope] If an optional block is passed to start_active_span it will
+    #   yield the newly-started Scope. If `finish_on_close` is true then the
+    #   Span will be finished automatically after the block is executed.
+    # @return [Scope, Object] If passed an optional block, start_active_span
+    #   returns the block's return value, otherwise it returns the newly-started
+    #   and activated Scope
+    def start_active_span(operation_name,
+                          child_of: nil,
+                          references: nil,
+                          start_time: Time.now,
+                          tags: nil,
+                          ignore_active_scope: false,
+                          finish_on_close: true)
+      if child_of.nil? && references.nil? && !ignore_active_scope
+        child_of = active_span
+      end
+
+      span = start_span(
+        operation_name,
+        child_of: child_of,
+        references: references,
+        start_time: start_time,
+        tags: tags,
+        ignore_active_scope: ignore_active_scope
+      )
+
+      scope_manager.activate(span: span, finish_on_close: finish_on_close).tap do |scope|
+        if block_given?
+          begin
+            return yield scope
+          ensure
+            scope.close
+          end
+        end
+      end
+    end
+
+    # Returns the span from the active scope, if any.
+    #
+    # @return [Span, nil] the active span. This is a shorthand for
+    #   `scope_manager.active.span`, and nil will be returned if
+    #   Scope#active is nil.
+    def active_span
+      scope = scope_manager.active
+      scope.span if scope
+    end
+
     # Starts a new span.
     #
     # @param operation_name [String] The operation name for the Span
     # @param child_of [SpanContext] SpanContext that acts as a parent to
     #        the newly-started Span. If a Span instance is provided, its
     #        .span_context is automatically substituted.
+    # @param references [Array<SpanContext>] An array of SpanContexts that
+    #         identify any parent SpanContexts of newly-started Span. If Spans
+    #         are provided, their .span_context is automatically substituted.
     # @param start_time [Time] When the Span started, if not now
     # @param tags [Hash] Tags to assign to the Span at start time
-    # @return [Span]
-    def start_span(operation_name, child_of: nil, start_time: nil, tags: nil)
-      Span.new(
+    # @param ignore_active_scope [Boolean] whether to create an implicit
+    #   References#CHILD_OF reference to the ScopeManager#active.
+    # @yield [Span] If passed an optional block, start_span will yield the
+    #   newly-created span to the block. The span will be finished automatically
+    #   after the block is executed.
+    # @return [Span, Object] If passed an optional block, start_span will return
+    #  the block's return value, otherwise it returns the newly-started Span
+    #  instance, which has not been automatically registered via the
+    #  ScopeManager
+    def start_span(operation_name, child_of: nil, references: nil, start_time: nil, tags: nil, ignore_active_scope: false)
+      if child_of.nil? && references.nil? && !ignore_active_scope
+        child_of = active_span
+      end
+
+      span_options = {
         tracer: self,
         operation_name: operation_name,
         child_of: child_of,
+        references: references,
         start_micros: start_time.nil? ? LightStep.micros(Time.now) : LightStep.micros(start_time),
         tags: tags,
         max_log_records: max_log_records,
-      )
+      }
+
+      Span.new(span_options).tap do |span|
+        if block_given?
+          begin
+            return yield span
+          ensure
+            span.finish
+          end
+        end
+      end
     end
+
 
     # Inject a SpanContext into the given carrier
     #
@@ -79,17 +199,7 @@ module LightStep
     # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY]
     # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     def inject(span_context, format, carrier)
-      child_of = child_of.span_context if (Span === child_of)
-      case format
-      when OpenTracing::FORMAT_TEXT_MAP
-        inject_to_text_map(span_context, carrier)
-      when OpenTracing::FORMAT_BINARY
-        warn 'Binary inject format not yet implemented'
-      when OpenTracing::FORMAT_RACK
-        inject_to_rack(span_context, carrier)
-      else
-        warn 'Unknown inject format'
-      end
+      @propagator.inject(span_context, format, carrier)
     end
 
     # Extract a SpanContext from a carrier
@@ -97,18 +207,7 @@ module LightStep
     # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
     # @return [SpanContext] the extracted SpanContext or nil if none could be found
     def extract(format, carrier)
-      case format
-      when OpenTracing::FORMAT_TEXT_MAP
-        extract_from_text_map(carrier)
-      when OpenTracing::FORMAT_BINARY
-        warn 'Binary join format not yet implemented'
-        nil
-      when OpenTracing::FORMAT_RACK
-        extract_from_rack(carrier)
-      else
-        warn 'Unknown join format'
-        nil
-      end
+      @propagator.extract(format, carrier)
     end
 
     # @return true if the tracer is enabled
@@ -145,8 +244,12 @@ module LightStep
 
     protected
 
-    def configure(component_name:, access_token: nil, transport: nil, tags: {})
-      raise ConfigurationError, "component_name must be a string" unless String === component_name
+    def configure(component_name:,
+                  access_token: nil,
+                  transport: nil, tags: {},
+                  propagator: :lightstep)
+
+      raise ConfigurationError, "component_name must be a string" unless component_name.is_a?(String)
       raise ConfigurationError, "component_name cannot be blank"  if component_name.empty?
 
       if transport.nil? and !access_token.nil?
@@ -155,6 +258,8 @@ module LightStep
 
       raise ConfigurationError, "you must provide an access token or a transport" if transport.nil?
       raise ConfigurationError, "#{transport} is not a LightStep transport class" if !(LightStep::Transport::Base === transport)
+
+      @propagator = Propagation[propagator]
 
       @guid = LightStep.guid
 
@@ -165,76 +270,6 @@ module LightStep
         component_name: component_name,
         tags: tags
       )
-    end
-
-    private
-
-    CARRIER_TRACER_STATE_PREFIX = 'ot-tracer-'.freeze
-    CARRIER_BAGGAGE_PREFIX = 'ot-baggage-'.freeze
-
-    CARRIER_SPAN_ID = (CARRIER_TRACER_STATE_PREFIX + 'spanid').freeze
-    CARRIER_TRACE_ID = (CARRIER_TRACER_STATE_PREFIX + 'traceid').freeze
-    CARRIER_SAMPLED = (CARRIER_TRACER_STATE_PREFIX + 'sampled').freeze
-
-    DEFAULT_MAX_LOG_RECORDS = 1000
-    MIN_MAX_LOG_RECORDS = 1
-    DEFAULT_MAX_SPAN_RECORDS = 1000
-    MIN_MAX_SPAN_RECORDS = 1
-
-    def inject_to_text_map(span_context, carrier)
-      carrier[CARRIER_SPAN_ID] = span_context.id
-      carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
-      carrier[CARRIER_SAMPLED] = 'true'
-
-      span_context.baggage.each do |key, value|
-        carrier[CARRIER_BAGGAGE_PREFIX + key] = value
-      end
-    end
-
-    def extract_from_text_map(carrier)
-      # If the carrier does not have both the span_id and trace_id key
-      # skip the processing and just return a normal span
-      if !carrier.has_key?(CARRIER_SPAN_ID) || !carrier.has_key?(CARRIER_TRACE_ID)
-        return nil
-      end
-
-      baggage = carrier.reduce({}) do |baggage, tuple|
-        key, value = tuple
-        if key.start_with?(CARRIER_BAGGAGE_PREFIX)
-          plain_key = key.to_s[CARRIER_BAGGAGE_PREFIX.length..key.to_s.length]
-          baggage[plain_key] = value
-        end
-        baggage
-      end
-      SpanContext.new(
-        id: carrier[CARRIER_SPAN_ID],
-        trace_id: carrier[CARRIER_TRACE_ID],
-        baggage: baggage,
-      )
-    end
-
-    def inject_to_rack(span_context, carrier)
-      carrier[CARRIER_SPAN_ID] = span_context.id
-      carrier[CARRIER_TRACE_ID] = span_context.trace_id unless span_context.trace_id.nil?
-      carrier[CARRIER_SAMPLED] = 'true'
-
-      span_context.baggage.each do |key, value|
-        if key =~ /[^A-Za-z0-9\-_]/
-          # TODO: log the error internally
-          next
-        end
-        carrier[CARRIER_BAGGAGE_PREFIX + key] = value
-      end
-    end
-
-    def extract_from_rack(env)
-      extract_from_text_map(env.reduce({}){|memo, tuple|
-        raw_header, value = tuple
-        header = raw_header.gsub(/^HTTP_/, '').gsub("_", "-").downcase
-
-        memo[header] = value if header.start_with?(CARRIER_TRACER_STATE_PREFIX, CARRIER_BAGGAGE_PREFIX)
-        memo
-      })
     end
   end
 end

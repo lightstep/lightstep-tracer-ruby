@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'active_support/core_ext/object/try'
 
 describe LightStep do
   def init_test_tracer

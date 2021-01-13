@@ -22,6 +22,13 @@ jobs:
       - checkout
       - run: gem install --no-document bundler && bundle install --jobs=3 --retry=3
       - run: bundle exec rake
+  test-ruby-30:
+    docker:
+      - image: circleci/ruby:3.0
+    steps:
+      - checkout
+      - run: gem install --no-document bundler && bundle install --jobs=3 --retry=3
+      - run: bundle exec rake
 
 workflows:
   version: 2
@@ -30,3 +37,4 @@ workflows:
       - test-ruby-24
       - test-ruby-25
       - test-ruby-26
+      - test-ruby-30

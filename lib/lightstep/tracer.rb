@@ -26,7 +26,7 @@ module LightStep
     # provided. A component_name is always required.
     # @param component_name [String] Component name to use for the tracer
     # @param access_token [String] The project access token when pushing to LightStep
-    # @param transport [LightStep::Transport] How the data should be transported
+    # @param transport [LightStep::Transport::Base] How the data should be transported
     # @param tags [Hash] Tracer-level tags
     # @param propagator [Propagator] Symbol one of :lightstep, :b3 indicating the propagator
     #   to use
@@ -181,7 +181,7 @@ module LightStep
         max_log_records: max_log_records,
       }
 
-      Span.new(span_options).tap do |span|
+      Span.new(**span_options).tap do |span|
         if block_given?
           begin
             return yield span

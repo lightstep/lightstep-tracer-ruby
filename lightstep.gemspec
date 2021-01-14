@@ -24,6 +24,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'opentracing', '~> 0.5.0'
   spec.add_development_dependency 'rake', '~> 13.0'
   spec.add_development_dependency 'rack', '~> 2.0'
+  spec.add_development_dependency 'webrick', '~> 1.7' # for examples/
   spec.add_development_dependency 'rspec', '~> 3.0'
   spec.add_development_dependency 'bump', '~> 0.5'
   spec.add_development_dependency 'simplecov', '~> 0.16'

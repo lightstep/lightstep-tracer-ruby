@@ -286,10 +286,10 @@ describe LightStep do
       STDERR,
       STDIN,
       file,
-      nil::NilClass
+      nil.class
     ]
     data.each do |value|
-      span.log_kv key: 'value'
+      span.log_kv(key: value)
     end
     span.finish
     file.close

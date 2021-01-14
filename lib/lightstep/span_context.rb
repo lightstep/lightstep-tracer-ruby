@@ -1,4 +1,4 @@
-#frozen_string_literal: true
+# frozen_string_literal: true
 
 module LightStep
   # SpanContext holds the data for a span that gets inherited to child spans

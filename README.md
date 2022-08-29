@@ -1,6 +1,6 @@
 # lightstep-tracer-ruby
 
-> ❗ **This instrumentation is no longer recommend**. Please review [documentation on setting up and configuring the OpenTelemetry Ruby API and SDK, and related gems](https://github.com/open-telemetry/opentelemetry-ruby) for more information.
+> ❗ **This instrumentation is no longer recommended**. Please review [documentation on setting up and configuring the OpenTelemetry Ruby API and SDK, and related gems](https://github.com/open-telemetry/opentelemetry-ruby) for more information.
 
 [![Gem Version](https://badge.fury.io/rb/lightstep.svg)](https://badge.fury.io/rb/lightstep) [![Circle CI](https://circleci.com/gh/lightstep/lightstep-tracer-ruby.svg?style=shield)](https://circleci.com/gh/lightstep/lightstep-tracer-ruby) [![MIT license](http://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT) [![Code Climate](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby/badges/gpa.svg)](https://codeclimate.com/github/lightstep/lightstep-tracer-ruby)
 

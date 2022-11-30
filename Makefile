@@ -1,4 +1,4 @@
-.PHONY: build test benchmark publish
+.PHONY: build test benchmark publish conformance
 
 build:
 	gem build lightstep.gemspec
@@ -22,3 +22,6 @@ bump-version:
 
 publish: build test benchmark bump-version
 	gem push lightstep-`ruby scripts/version.rb`.gem
+
+conformance: cloudbuild.yaml
+	gcloud builds submit --config cloudbuild.yaml .
